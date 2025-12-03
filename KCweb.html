@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Condo Association Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    h1 { margin-bottom: 8px; }
+    h2 { margin: 24px 0 8px; }
+    .container { display: flex; gap: 24px; flex-wrap: wrap; }
+    .building { flex: 1 1 480px; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+    .section { margin-bottom: 16px; }
+    .floor { margin: 8px 0; }
+    .label { font-weight: bold; margin-bottom: 4px; }
+    .row { display: flex; }
+    .unit {
+      width: 64px; height: 44px;
+      margin: 4px;
+      background: #e9eff7;
+      text-align: center;
+      line-height: 44px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid #c8d3e3;
+      font-weight: 600;
+    }
+    .unit:hover { background: #d6e4f5; }
+    /* Modal */
+    #modalBackdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.3);
+    }
+    #modal {
+      position: fixed; 
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: white; 
+      padding: 20px; 
+      border: 2px solid #333; 
+      border-radius: 8px;
+      width: 320px;
+    }
+    #modal h3 { margin-top: 0; }
+    .modal-actions { text-align: right; margin-top: 12px; }
+    .btn { cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid #999; }
+    .btn.close { background: #f6f6f6; }
+  </style>
+</head>
+<body>
+
+<h1>Condo Association Portal</h1>
+<p>Click any unit to view details. Views: Floor Plan, Front (odd units), Rear (even units).</p>
+
+<div class="container">
+
+  <!-- Building 1 -->
+  <div class="building">
+    <h2>Building 1 — Floor plan view</h2>
+    <!-- Floor 3 (top) -->
+    <div class="floor">
+      <div class="label">Floor 3</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('132')">132</div>
+        <div class="unit" onclick="showInfo('134')">134</div>
+        <div class="unit" onclick="showInfo('136')">136</div>
+        <div class="unit" onclick="showInfo('138')">138</div>
+      </div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('131')">131</div>
+        <div class="unit" onclick="showInfo('133')">133</div>
+        <div class="unit" onclick="showInfo('135')">135</div>
+        <div class="unit" onclick="showInfo('137')">137</div>
+      </div>
+    </div>
+    <!-- Floor 2 (middle) -->
+    <div class="floor">
+      <div class="label">Floor 2</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('122')">122</div>
+        <div class="unit" onclick="showInfo('124')">124</div>
+        <div class="unit" onclick="showInfo('126')">126</div>
+        <div class="unit" onclick="showInfo('128')">128</div>
+      </div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('121')">121</div>
+        <div class="unit" onclick="showInfo('123')">123</div>
+        <div class="unit" onclick="showInfo('125')">125</div>
+        <div class="unit" onclick="showInfo('127')">127</div>
+      </div>
+    </div>
+    <!-- Floor 1 (bottom) -->
+    <div class="floor">
+      <div class="label">Floor 1</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('112')">112</div>
+        <div class="unit" onclick="showInfo('114')">114</div>
+        <div class="unit" onclick="showInfo('116')">116</div>
+        <div class="unit" onclick="showInfo('118')">118</div>
+      </div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('111')">111</div>
+        <div class="unit" onclick="showInfo('113')">113</div>
+        <div class="unit" onclick="showInfo('115')">115</div>
+        <div class="unit" onclick="showInfo('117')">117</div>
+      </div>
+    </div>
+
+    <h2>Building 1 — Front view (odd units)</h2>
+    <div class="floor">
+      <div class="label">Floor 3</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('131')">131</div>
+        <div class="unit" onclick="showInfo('133')">133</div>
+        <div class="unit" onclick="showInfo('135')">135</div>
+        <div class="unit" onclick="showInfo('137')">137</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 2</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('121')">121</div>
+        <div class="unit" onclick="showInfo('123')">123</div>
+        <div class="unit" onclick="showInfo('125')">125</div>
+        <div class="unit" onclick="showInfo('127')">127</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 1</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('111')">111</div>
+        <div class="unit" onclick="showInfo('113')">113</div>
+        <div class="unit" onclick="showInfo('115')">115</div>
+        <div class="unit" onclick="showInfo('117')">117</div>
+      </div>
+    </div>
+
+    <h2>Building 1 — Rear view (even units)</h2>
+    <div class="floor">
+      <div class="label">Floor 3</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('132')">132</div>
+        <div class="unit" onclick="showInfo('134')">134</div>
+        <div class="unit" onclick="showInfo('136')">136</div>
+        <div class="unit" onclick="showInfo('138')">138</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 2</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('122')">122</div>
+        <div class="unit" onclick="showInfo('124')">124</div>
+        <div class="unit" onclick="showInfo('126')">126</div>
+        <div class="unit" onclick="showInfo('128')">128</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 1</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('112')">112</div>
+        <div class="unit" onclick="showInfo('114')">114</div>
+        <div class="unit" onclick="showInfo('116')">116</div>
+        <div class="unit" onclick="showInfo('118')">118</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Building 2 -->
+  <div class="building">
+    <h2>Building 2 — Floor plan view</h2>
+    <!-- Floor 3 (top) -->
+    <div class="floor">
+      <div class="label">Floor 3</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('232')">232</div>
+        <div class="unit" onclick="showInfo('234')">234</div>
+        <div class="unit" onclick="showInfo('236')">236</div>
+        <div class="unit" onclick="showInfo('238')">238</div>
+      </div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('231')">231</div>
+        <div class="unit" onclick="showInfo('233')">233</div>
+        <div class="unit" onclick="showInfo('235')">235</div>
+        <div class="unit" onclick="showInfo('237')">237</div>
+      </div>
+    </div>
+    <!-- Floor 2 (middle) -->
+    <div class="floor">
+      <div class="label">Floor 2</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('222')">222</div>
+        <div class="unit" onclick="showInfo('224')">224</div>
+        <div class="unit" onclick="showInfo('226')">226</div>
+        <div class="unit" onclick="showInfo('228')">228</div>
+      </div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('221')">221</div>
+        <div class="unit" onclick="showInfo('223')">223</div>
+        <div class="unit" onclick="showInfo('225')">225</div>
+        <div class="unit" onclick="showInfo('227')">227</div>
+      </div>
+    </div>
+    <!-- Floor 1 (bottom) -->
+    <div class="floor">
+      <div class="label">Floor 1</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('212')">212</div>
+        <div class="unit" onclick="showInfo('214')">214</div>
+        <div class="unit" onclick="showInfo('216')">216</div>
+        <div class="unit" onclick="showInfo('218')">218</div>
+      </div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('211')">211</div>
+        <div class="unit" onclick="showInfo('213')">213</div>
+        <div class="unit" onclick="showInfo('215')">215</div>
+        <div class="unit" onclick="showInfo('217')">217</div>
+      </div>
+    </div>
+
+    <h2>Building 2 — Front view (odd units)</h2>
+    <div class="floor">
+      <div class="label">Floor 3</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('231')">231</div>
+        <div class="unit" onclick="showInfo('233')">233</div>
+        <div class="unit" onclick="showInfo('235')">235</div>
+        <div class="unit" onclick="showInfo('237')">237</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 2</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('221')">221</div>
+        <div class="unit" onclick="showInfo('223')">223</div>
+        <div class="unit" onclick="showInfo('225')">225</div>
+        <div class="unit" onclick="showInfo('227')">227</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 1</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('211')">211</div>
+        <div class="unit" onclick="showInfo('213')">213</div>
+        <div class="unit" onclick="showInfo('215')">215</div>
+        <div class="unit" onclick="showInfo('217')">217</div>
+      </div>
+    </div>
+
+    <h2>Building 2 — Rear view (even units)</h2>
+    <div class="floor">
+      <div class="label">Floor 3</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('232')">232</div>
+        <div class="unit" onclick="showInfo('234')">234</div>
+        <div class="unit" onclick="showInfo('236')">236</div>
+        <div class="unit" onclick="showInfo('238')">238</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 2</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('222')">222</div>
+        <div class="unit" onclick="showInfo('224')">224</div>
+        <div class="unit" onclick="showInfo('226')">226</div>
+        <div class="unit" onclick="showInfo('228')">228</div>
+      </div>
+    </div>
+    <div class="floor">
+      <div class="label">Floor 1</div>
+      <div class="row">
+        <div class="unit" onclick="showInfo('212')">212</div>
+        <div class="unit" onclick="showInfo('214')">214</div>
+        <div class="unit" onclick="showInfo('216')">216</div>
+        <div class="unit" onclick="showInfo('218')">218</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modalBackdrop" onclick="closeModal()"></div>
+<div id="modal" role="dialog" aria-modal="true">
+  <h3>Unit info</h3>
+  <p id="unitDetails"></p>
+  <div class="modal-actions">
+    <button class="btn close" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+  // Shared static data — replace with your real info per unit
+  const unitData = {
+    "111": {owner: "Owner 111", email: "111@example.com", status: "Owner Occupied"},
+    "112": {owner: "Owner 112", email: "112@example.com", status: "Rented"},
+    // Add all units as needed...
+  };
+
+  function showInfo(unit) {
+    const info = unitData[unit] || {owner: "Unknown", email: "N/A", status: "N/A"};
+    document.getElementById('unitDetails').innerHTML =
+      "Unit: " + unit + "<br>" +
+      "Owner: " + info.owner + "<br>" +
+      "Email: " + info.email + "<br>" +
+      "Status: " + info.status;
+    document.getElementById('modalBackdrop').style.display = 'block';
+    document.getElementById('modal').style.display = 'block';
+  }
+
+  function closeModal() {
+    document.getElementById('modalBackdrop').style.display = 'none';
+    document.getElementById('modal').style.display = 'none';
+  }
+</script>
+
+</body>
+</html>
