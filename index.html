@@ -1,56 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Condo Association Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; }
-    h1 { margin-bottom: 8px; }
-    h2 { margin: 24px 0 8px; }
-    .container { display: flex; gap: 24px; flex-wrap: wrap; }
-    .building { flex: 1 1 480px; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
-    .section { margin-bottom: 16px; }
-    .floor { margin: 8px 0; }
-    .label { font-weight: bold; margin-bottom: 4px; }
-    .row { display: flex; }
+    :root {
+      --bg: #f7fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --muted: #4a5568;
+      --unit: #e9eff7;
+      --unit-border: #c8d3e3;
+      --unit-hover: #d6e4f5;
+      --accent: #2b6cb0;
+    }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    .subtitle { color: var(--muted); font-size: 14px; }
+
+    .container {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 24px;
+    }
+    .building {
+      flex: 1 1 520px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    h2 {
+      margin: 12px 0 8px;
+      font-size: 18px;
+      color: var(--accent);
+    }
+    .section {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+    .floor { margin: 10px 0; }
+    .label { font-weight: 700; margin-bottom: 6px; font-size: 14px; color: var(--muted); }
+    .row { display: flex; flex-wrap: nowrap; }
     .unit {
       width: 64px; height: 44px;
       margin: 4px;
-      background: #e9eff7;
+      background: var(--unit);
+      border: 1px solid var(--unit-border);
+      border-radius: 6px;
       text-align: center;
       line-height: 44px;
-      cursor: pointer;
-      border-radius: 6px;
-      border: 1px solid #c8d3e3;
       font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
     }
-    .unit:hover { background: #d6e4f5; }
+    .unit:hover { background: var(--unit-hover); }
+
     /* Modal */
     #modalBackdrop {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.35);
     }
     #modal {
-      position: fixed; 
+      display: none;
+      position: fixed;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      background: white; 
-      padding: 20px; 
-      border: 2px solid #333; 
-      border-radius: 8px;
-      width: 320px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 360px;
+      max-width: 90vw;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
-    #modal h3 { margin-top: 0; }
-    .modal-actions { text-align: right; margin-top: 12px; }
-    .btn { cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid #999; }
-    .btn.close { background: #f6f6f6; }
+    .modal-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-title { font-weight: 700; }
+    .modal-close {
+      border: none; background: transparent; font-size: 18px; cursor: pointer; color: var(--muted);
+    }
+    .modal-body { padding: 14px 16px; font-size: 14px; }
+    .kv { margin: 6px 0; }
+    .kv .k { color: var(--muted); font-weight: 600; margin-right: 6px; }
+
+    /* Responsive tweaks */
+    @media (max-width: 768px) {
+      .unit { width: 56px; height: 40px; line-height: 40px; }
+      .building { flex: 1 1 100%; }
+    }
   </style>
 </head>
 <body>
 
-<h1>Condo Association Portal</h1>
-<p>Click any unit to view details. Views: Floor Plan, Front (odd units), Rear (even units).</p>
+<header>
+  <h1>Condo Association Portal</h1>
+  <div class="subtitle">Views: Floor plan (hallway with facing units), Front (odd units), Rear (even units). Click any unit to view details.</div>
+</header>
 
 <div class="container">
 
@@ -58,8 +125,7 @@
   <div class="building">
     <h2>Building 1 — Floor plan view</h2>
     <!-- Floor 3 (top) -->
-    <div class="floor">
-      <div class="label">Floor 3</div>
+    <div class="floor"><div class="label">Floor 3</div>
       <div class="row">
         <div class="unit" onclick="showInfo('132')">132</div>
         <div class="unit" onclick="showInfo('134')">134</div>
@@ -74,8 +140,7 @@
       </div>
     </div>
     <!-- Floor 2 (middle) -->
-    <div class="floor">
-      <div class="label">Floor 2</div>
+    <div class="floor"><div class="label">Floor 2</div>
       <div class="row">
         <div class="unit" onclick="showInfo('122')">122</div>
         <div class="unit" onclick="showInfo('124')">124</div>
@@ -90,8 +155,7 @@
       </div>
     </div>
     <!-- Floor 1 (bottom) -->
-    <div class="floor">
-      <div class="label">Floor 1</div>
+    <div class="floor"><div class="label">Floor 1</div>
       <div class="row">
         <div class="unit" onclick="showInfo('112')">112</div>
         <div class="unit" onclick="showInfo('114')">114</div>
@@ -106,62 +170,48 @@
       </div>
     </div>
 
-    <h2>Building 1 — Front view (odd units)</h2>
-    <div class="floor">
-      <div class="label">Floor 3</div>
-      <div class="row">
+    <div class="section">
+      <h2>Building 1 — Front view (odd units)</h2>
+      <div class="floor"><div class="label">Floor 3</div><div class="row">
         <div class="unit" onclick="showInfo('131')">131</div>
         <div class="unit" onclick="showInfo('133')">133</div>
         <div class="unit" onclick="showInfo('135')">135</div>
         <div class="unit" onclick="showInfo('137')">137</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 2</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 2</div><div class="row">
         <div class="unit" onclick="showInfo('121')">121</div>
         <div class="unit" onclick="showInfo('123')">123</div>
         <div class="unit" onclick="showInfo('125')">125</div>
         <div class="unit" onclick="showInfo('127')">127</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 1</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 1</div><div class="row">
         <div class="unit" onclick="showInfo('111')">111</div>
         <div class="unit" onclick="showInfo('113')">113</div>
         <div class="unit" onclick="showInfo('115')">115</div>
         <div class="unit" onclick="showInfo('117')">117</div>
-      </div>
+      </div></div>
     </div>
 
-    <h2>Building 1 — Rear view (even units)</h2>
-    <div class="floor">
-      <div class="label">Floor 3</div>
-      <div class="row">
+    <div class="section">
+      <h2>Building 1 — Rear view (even units)</h2>
+      <div class="floor"><div class="label">Floor 3</div><div class="row">
         <div class="unit" onclick="showInfo('132')">132</div>
         <div class="unit" onclick="showInfo('134')">134</div>
         <div class="unit" onclick="showInfo('136')">136</div>
         <div class="unit" onclick="showInfo('138')">138</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 2</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 2</div><div class="row">
         <div class="unit" onclick="showInfo('122')">122</div>
         <div class="unit" onclick="showInfo('124')">124</div>
         <div class="unit" onclick="showInfo('126')">126</div>
         <div class="unit" onclick="showInfo('128')">128</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 1</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 1</div><div class="row">
         <div class="unit" onclick="showInfo('112')">112</div>
         <div class="unit" onclick="showInfo('114')">114</div>
         <div class="unit" onclick="showInfo('116')">116</div>
         <div class="unit" onclick="showInfo('118')">118</div>
-      </div>
+      </div></div>
     </div>
   </div>
 
@@ -169,8 +219,7 @@
   <div class="building">
     <h2>Building 2 — Floor plan view</h2>
     <!-- Floor 3 (top) -->
-    <div class="floor">
-      <div class="label">Floor 3</div>
+    <div class="floor"><div class="label">Floor 3</div>
       <div class="row">
         <div class="unit" onclick="showInfo('232')">232</div>
         <div class="unit" onclick="showInfo('234')">234</div>
@@ -185,8 +234,7 @@
       </div>
     </div>
     <!-- Floor 2 (middle) -->
-    <div class="floor">
-      <div class="label">Floor 2</div>
+    <div class="floor"><div class="label">Floor 2</div>
       <div class="row">
         <div class="unit" onclick="showInfo('222')">222</div>
         <div class="unit" onclick="showInfo('224')">224</div>
@@ -201,8 +249,7 @@
       </div>
     </div>
     <!-- Floor 1 (bottom) -->
-    <div class="floor">
-      <div class="label">Floor 1</div>
+    <div class="floor"><div class="label">Floor 1</div>
       <div class="row">
         <div class="unit" onclick="showInfo('212')">212</div>
         <div class="unit" onclick="showInfo('214')">214</div>
@@ -217,62 +264,48 @@
       </div>
     </div>
 
-    <h2>Building 2 — Front view (odd units)</h2>
-    <div class="floor">
-      <div class="label">Floor 3</div>
-      <div class="row">
+    <div class="section">
+      <h2>Building 2 — Front view (odd units)</h2>
+      <div class="floor"><div class="label">Floor 3</div><div class="row">
         <div class="unit" onclick="showInfo('231')">231</div>
         <div class="unit" onclick="showInfo('233')">233</div>
         <div class="unit" onclick="showInfo('235')">235</div>
         <div class="unit" onclick="showInfo('237')">237</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 2</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 2</div><div class="row">
         <div class="unit" onclick="showInfo('221')">221</div>
         <div class="unit" onclick="showInfo('223')">223</div>
         <div class="unit" onclick="showInfo('225')">225</div>
         <div class="unit" onclick="showInfo('227')">227</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 1</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 1</div><div class="row">
         <div class="unit" onclick="showInfo('211')">211</div>
         <div class="unit" onclick="showInfo('213')">213</div>
         <div class="unit" onclick="showInfo('215')">215</div>
         <div class="unit" onclick="showInfo('217')">217</div>
-      </div>
+      </div></div>
     </div>
 
-    <h2>Building 2 — Rear view (even units)</h2>
-    <div class="floor">
-      <div class="label">Floor 3</div>
-      <div class="row">
+    <div class="section">
+      <h2>Building 2 — Rear view (even units)</h2>
+      <div class="floor"><div class="label">Floor 3</div><div class="row">
         <div class="unit" onclick="showInfo('232')">232</div>
         <div class="unit" onclick="showInfo('234')">234</div>
         <div class="unit" onclick="showInfo('236')">236</div>
         <div class="unit" onclick="showInfo('238')">238</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 2</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 2</div><div class="row">
         <div class="unit" onclick="showInfo('222')">222</div>
         <div class="unit" onclick="showInfo('224')">224</div>
         <div class="unit" onclick="showInfo('226')">226</div>
         <div class="unit" onclick="showInfo('228')">228</div>
-      </div>
-    </div>
-    <div class="floor">
-      <div class="label">Floor 1</div>
-      <div class="row">
+      </div></div>
+      <div class="floor"><div class="label">Floor 1</div><div class="row">
         <div class="unit" onclick="showInfo('212')">212</div>
         <div class="unit" onclick="showInfo('214')">214</div>
         <div class="unit" onclick="showInfo('216')">216</div>
         <div class="unit" onclick="showInfo('218')">218</div>
-      </div>
+      </div></div>
     </div>
   </div>
 </div>
@@ -280,28 +313,88 @@
 <!-- Modal -->
 <div id="modalBackdrop" onclick="closeModal()"></div>
 <div id="modal" role="dialog" aria-modal="true">
-  <h3>Unit info</h3>
-  <p id="unitDetails"></p>
-  <div class="modal-actions">
-    <button class="btn close" onclick="closeModal()">Close</button>
+  <div class="modal-header">
+    <span class="modal-title">Unit info</span>
+    <button class="modal-close" aria-label="Close" onclick="closeModal()">×</button>
+  </div>
+  <div class="modal-body">
+    <div class="kv"><span class="k">Unit:</span> <span id="kvUnit"></span></div>
+    <div class="kv"><span class="k">Owner:</span> <span id="kvOwner"></span></div>
+    <div class="kv"><span class="k">Email:</span> <span id="kvEmail"></span></div>
+    <div class="kv"><span class="k">Status:</span> <span id="kvStatus"></span></div>
   </div>
 </div>
 
 <script>
-  // Shared static data — replace with your real info per unit
+  // Shared static data — add/replace with real info for each unit
   const unitData = {
-    "111": {owner: "Owner 111", email: "111@example.com", status: "Owner Occupied"},
-    "112": {owner: "Owner 112", email: "112@example.com", status: "Rented"},
-    // Add all units as needed...
+    // Building 1, Floor 1
+    "111": { owner: "Owner 111", email: "111@example.com", status: "Owner Occupied" },
+    "112": { owner: "Owner 112", email: "112@example.com", status: "Rented" },
+    "113": { owner: "Owner 113", email: "113@example.com", status: "Owner Occupied" },
+    "114": { owner: "Owner 114", email: "114@example.com", status: "Vacant" },
+    "115": { owner: "Owner 115", email: "115@example.com", status: "Rented" },
+    "116": { owner: "Owner 116", email: "116@example.com", status: "Owner Occupied" },
+    "117": { owner: "Owner 117", email: "117@example.com", status: "Rented" },
+    "118": { owner: "Owner 118", email: "118@example.com", status: "Owner Occupied" },
+
+    // Building 1, Floor 2
+    "121": { owner: "Owner 121", email: "121@example.com", status: "Owner Occupied" },
+    "122": { owner: "Owner 122", email: "122@example.com", status: "Rented" },
+    "123": { owner: "Owner 123", email: "123@example.com", status: "Owner Occupied" },
+    "124": { owner: "Owner 124", email: "124@example.com", status: "Vacant" },
+    "125": { owner: "Owner 125", email: "125@example.com", status: "Rented" },
+    "126": { owner: "Owner 126", email: "126@example.com", status: "Owner Occupied" },
+    "127": { owner: "Owner 127", email: "127@example.com", status: "Rented" },
+    "128": { owner: "Owner 128", email: "128@example.com", status: "Owner Occupied" },
+
+    // Building 1, Floor 3
+    "131": { owner: "Owner 131", email: "131@example.com", status: "Owner Occupied" },
+    "132": { owner: "Owner 132", email: "132@example.com", status: "Rented" },
+    "133": { owner: "Owner 133", email: "133@example.com", status: "Owner Occupied" },
+    "134": { owner: "Owner 134", email: "134@example.com", status: "Vacant" },
+    "135": { owner: "Owner 135", email: "135@example.com", status: "Rented" },
+    "136": { owner: "Owner 136", email: "136@example.com", status: "Owner Occupied" },
+    "137": { owner: "Owner 137", email: "137@example.com", status: "Rented" },
+    "138": { owner: "Owner 138", email: "138@example.com", status: "Owner Occupied" },
+
+    // Building 2, Floor 1
+    "211": { owner: "Owner 211", email: "211@example.com", status: "Owner Occupied" },
+    "212": { owner: "Owner 212", email: "212@example.com", status: "Rented" },
+    "213": { owner: "Owner 213", email: "213@example.com", status: "Owner Occupied" },
+    "214": { owner: "Owner 214", email: "214@example.com", status: "Vacant" },
+    "215": { owner: "Owner 215", email: "215@example.com", status: "Rented" },
+    "216": { owner: "Owner 216", email: "216@example.com", status: "Owner Occupied" },
+    "217": { owner: "Owner 217", email: "217@example.com", status: "Rented" },
+    "218": { owner: "Owner 218", email: "218@example.com", status: "Owner Occupied" },
+
+    // Building 2, Floor 2
+    "221": { owner: "Owner 221", email: "221@example.com", status: "Owner Occupied" },
+    "222": { owner: "Owner 222", email: "222@example.com", status: "Rented" },
+    "223": { owner: "Owner 223", email: "223@example.com", status: "Owner Occupied" },
+    "224": { owner: "Owner 224", email: "224@example.com", status: "Vacant" },
+    "225": { owner: "Owner 225", email: "225@example.com", status: "Rented" },
+    "226": { owner: "Owner 226", email: "226@example.com", status: "Owner Occupied" },
+    "227": { owner: "Owner 227", email: "227@example.com", status: "Rented" },
+    "228": { owner: "Owner 228", email: "228@example.com", status: "Owner Occupied" },
+
+    // Building 2, Floor 3
+    "231": { owner: "Owner 231", email: "231@example.com", status: "Owner Occupied" },
+    "232": { owner: "Owner 232", email: "232@example.com", status: "Rented" },
+    "233": { owner: "Owner 233", email: "233@example.com", status: "Owner Occupied" },
+    "234": { owner: "Owner 234", email: "234@example.com", status: "Vacant" },
+    "235": { owner: "Owner 235", email: "235@example.com", status: "Rented" },
+    "236": { owner: "Owner 236", email: "236@example.com", status: "Owner Occupied" },
+    "237": { owner: "Owner 237", email: "237@example.com", status: "Rented" },
+    "238": { owner: "Owner 238", email: "238@example.com", status: "Owner Occupied" }
   };
 
   function showInfo(unit) {
-    const info = unitData[unit] || {owner: "Unknown", email: "N/A", status: "N/A"};
-    document.getElementById('unitDetails').innerHTML =
-      "Unit: " + unit + "<br>" +
-      "Owner: " + info.owner + "<br>" +
-      "Email: " + info.email + "<br>" +
-      "Status: " + info.status;
+    const info = unitData[unit] || { owner: "Unknown", email: "N/A", status: "N/A" };
+    document.getElementById('kvUnit').textContent = unit;
+    document.getElementById('kvOwner').textContent = info.owner;
+    document.getElementById('kvEmail').textContent = info.email;
+    document.getElementById('kvStatus').textContent = info.status;
     document.getElementById('modalBackdrop').style.display = 'block';
     document.getElementById('modal').style.display = 'block';
   }
