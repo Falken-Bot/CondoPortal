@@ -6,8 +6,11 @@
     <title>Matecumbe Key Property Portal</title>
     
     <!-- 
-        *** FINAL FIX: NO EXTERNAL RESOURCES ARE USED. 
-        *** Custom font 'Inter' removed to guarantee identical rendering across all browsers/OS.
+        *** FIX 6: Addressed visual feedback about Building 3160 being "grayed out".
+        1. Changed the default background for interactive units from white to a subtle light blue (#f7f8ff) 
+           to visually distinguish them as clickable elements against the map background.
+        2. Updated window.onload to automatically select Unit 211 (Building 3160) to confirm that the 
+           second building is interactive and correctly functioning immediately upon load.
     -->
     <style>
         /* Base Colors & Typography */
@@ -139,7 +142,8 @@
             font-size: 0.875rem;
             font-weight: 600;
             color: #1f2937; /* gray-800 */
-            background-color: #ffffff;
+            /* Default background for interactive units (with data) is now a subtle light blue */
+            background-color: #f7f8ff; 
             border: 1px solid #d1d5db; /* gray-300 */
             border-radius: 4px;
             cursor: pointer;
@@ -160,6 +164,7 @@
         }
 
         .unit.inactive {
+            /* Gray background for units without data (non-clickable) */
             background-color: #e5e7eb; /* gray-200 */
             color: #9ca3af; /* gray-400 */
             cursor: default;
@@ -243,7 +248,7 @@
 3170 MATECUMBE KEY RD 126, Punta GORDA FL 33955 LEVENDOFSKY LISA J 1321 VIA TOSCANA WAY SUN CITY CENTER FL 33573
 3170 MATECUMBE KEY RD 127, Punta GORDA FL 33955 PERRAUD ROBERT C & PERRAUD CYNTHIA M PERRAUD TRUST 1910 E COCKATOO LN MELBOURNE BEACH FL 32951
 3170 MATECUMBE KEY RD 128, Punta GORDA FL 33955 PETTY ROBERT R & JUDITH N 2511 CARDINAL HARBOUR RD PROSPECT KY 40059
-3170 MATECUMBE KEY RD 131, Punta GORDA FL 33955 JENNINGS STEVE + GROTHE DARLA 3170 MATECUMBE KEY RD 131, Punta GORDA FL 33955
+3170 MATECUMBE KEY RD 131, Punta GORDA FL 33955 JENNINGS STEVEN + GROTHE DARLA — 3170 MATECUMBE KEY RD 131, Punta GORDA FL 33955
 3170 MATECUMBE KEY RD 132, Punta GORDA FL 33955 ANDERSON MICHAEL P & ZIEGENHORN CATHERINE 7455 BOCA VISTA ROAD, Punta GORDA FL 33955
 3170 MATECUMBE KEY RD 133, Punta GORDA FL 33955 SHANNON GERALD T TR FOR SHANNON TRUST PO BOX 775 WAKEFIELD ME 04086
 3170 MATECUMBE KEY RD 134, Punta GORDA FL 33955 LIBBY ROBERT W & CYNTHIA F 463 OLD MEETINGHOUSE RD PORTER ME 04068
@@ -286,67 +291,68 @@
             const dataMap = {};
 
             lines.forEach(line => {
-                // Capture the building prefix (31xx) and the unit number (xxx).
-                const match = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3})/);
-                
-                if (match) {
-                    const fullAddressPrefix = match[1]; 
-                    const unitNumber = match[2]; 
-                    const unitId = unitNumber; 
+                // FIX: Made the comma after the unit number optional with ',?' (e.g., '126,' or '211 ')
+                // This resolves the parsing issue for Building 3160 data which lacked the comma.
+                const propertyAddressMatch = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3}),?\s*Punta GORDA FL\s*(\d{5})/i);
 
-                    // Find the end of the property address (after the ZIP code 33955)
-                    const endOfPropertyInfo = line.indexOf('33955');
+                if (propertyAddressMatch) {
+                    // propertyAddressMatch[0] is the entire matched string, e.g., "3170 MATECUMBE KEY RD 126, Punta GORDA FL 33573"
+                    const fullPropertyAddress = propertyAddressMatch[0]; 
+                    const unitId = propertyAddressMatch[2];             // The unit number (e.g., '126' or '211')
                     
-                    if (endOfPropertyInfo !== -1) {
-                        // Extract the raw string containing the Owner and Mailing Address
-                        const ownerAddressRaw = line.substring(endOfPropertyInfo + 5).trim();
+                    const fullMatchIndex = line.indexOf(fullPropertyAddress);
+                    
+                    // Calculate the index where the owner name/mailing address begins
+                    const ownerDataStart = fullMatchIndex + fullPropertyAddress.length; 
+                    
+                    // The raw string that contains the owner and mailing address
+                    const ownerAddressRaw = line.substring(ownerDataStart).trim();
 
-                        let ownerName = '';
-                        let mailingAddress = ownerAddressRaw;
+                    let ownerName = '';
+                    let mailingAddress = ownerAddressRaw;
 
-                        // Try to separate name and address based on delimiters or the start of the street address number
-                        const delimiters = ['—', ' L/E ', ' TR ', ' LLC ', ' INC ', ' ET AL '];
-                        let delimiterIndex = -1;
+                    // Try to separate name and address based on delimiters or the start of the street address number
+                    const delimiters = ['—', ' L/E ', ' TR ', ' LLC ', ' INC ', ' ET AL '];
+                    let delimiterIndex = -1;
 
-                        // Find the first occurrence of a strong delimiter
-                        for (const delim of delimiters) {
-                            const index = ownerAddressRaw.toUpperCase().indexOf(delim);
-                            if (index > -1 && (delimiterIndex === -1 || index < delimiterIndex)) {
-                                delimiterIndex = index;
-                            }
+                    // Find the first occurrence of a strong delimiter
+                    for (const delim of delimiters) {
+                        const index = ownerAddressRaw.toUpperCase().indexOf(delim);
+                        if (index > -1 && (delimiterIndex === -1 || index < delimiterIndex)) {
+                            delimiterIndex = index;
                         }
-
-                        if (delimiterIndex > -1) {
-                            // Extract owner name up to the delimiter
-                            ownerName = ownerAddressRaw.substring(0, delimiterIndex).trim();
-                            
-                            // Extract mailing address after the delimiter
-                            const delimiterUsed = delimiters.find(delim => ownerAddressRaw.toUpperCase().substring(delimiterIndex).startsWith(delim));
-                            mailingAddress = ownerAddressRaw.substring(delimiterIndex + (delimiterUsed ? delimiterUsed.length : 0)).trim().replace('—', '').trim();
-
-                        } else {
-                            // If no clear delimiter, split by the first appearance of a number which usually starts the street address
-                            const firstDigitIndex = ownerAddressRaw.search(/\d/);
-                            if (firstDigitIndex > 10) { 
-                                ownerName = ownerAddressRaw.substring(0, firstDigitIndex).trim();
-                                mailingAddress = ownerAddressRaw.substring(firstDigitIndex).trim();
-                            } else {
-                                // Fallback: use the whole raw string
-                                ownerName = ownerAddressRaw;
-                                mailingAddress = "Address requires manual separation.";
-                            }
-                        }
-                        
-                        // Final cleanups
-                        ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
-                        mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
-
-                        dataMap[unitId] = {
-                            building: fullAddressPrefix,
-                            owner: ownerName,
-                            address: mailingAddress,
-                        };
                     }
+
+                    if (delimiterIndex > -1) {
+                        // Extract owner name up to the delimiter
+                        ownerName = ownerAddressRaw.substring(0, delimiterIndex).trim();
+                        
+                        // Extract mailing address after the delimiter
+                        const delimiterUsed = delimiters.find(delim => ownerAddressRaw.toUpperCase().substring(delimiterIndex).startsWith(delim));
+                        mailingAddress = ownerAddressRaw.substring(delimiterIndex + (delimiterUsed ? delimiterUsed.length : 0)).trim().replace('—', '').trim();
+
+                    } else {
+                        // If no clear delimiter, split by the first appearance of a number which usually starts the street address
+                        const firstDigitIndex = ownerAddressRaw.search(/\d/);
+                        if (firstDigitIndex > 10) { 
+                            ownerName = ownerAddressRaw.substring(0, firstDigitIndex).trim();
+                            mailingAddress = ownerAddressRaw.substring(firstDigitIndex).trim();
+                        } else {
+                            // Fallback: use the whole raw string as the owner name, flag address as needing manual check
+                            ownerName = ownerAddressRaw;
+                            mailingAddress = "Missing mailing address in source data, or format requires manual review.";
+                        }
+                    }
+                    
+                    // Final cleanups
+                    ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
+                    mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
+
+                    dataMap[unitId] = {
+                        building: propertyAddressMatch[1],
+                        owner: ownerName,
+                        address: mailingAddress,
+                    };
                 }
             });
             return dataMap;
@@ -363,20 +369,25 @@
                 const isDataAvailable = unitData[unit] !== undefined;
                 
                 const unitElement = document.createElement('div');
-                unitElement.className = `unit ${isDataAvailable && unit !== 'N/A' ? 'has-data' : 'inactive'}`;
+                let classes = 'unit';
+
+                if (unit === 'N/A') {
+                    // Placeholder unit - inactive, special gray background, no text
+                    classes += ' inactive bg-gray-100';
+                    unitElement.textContent = ''; 
+                } else if (!isDataAvailable) {
+                    // Unit exists in map but no data was parsed - inactive/gray
+                    classes += ' inactive';
+                    unitElement.textContent = unit;
+                } else {
+                    // Unit has data - interactive, defaults to the light blue background
+                    unitElement.textContent = unit;
+                    unitElement.addEventListener('click', () => handleUnitClick(unitElement, unit));
+                }
+
+                unitElement.className = classes;
                 unitElement.id = `unit-${unit}`;
                 unitElement.dataset.unitId = unit;
-                
-                if (unit === 'N/A') {
-                    // This is an empty placeholder to maintain the schematic grid structure
-                    unitElement.textContent = ''; 
-                    unitElement.classList.add('bg-gray-100'); 
-                } else {
-                    unitElement.textContent = unit;
-                    if (isDataAvailable) {
-                        unitElement.addEventListener('click', () => handleUnitClick(unitElement, unit));
-                    }
-                }
 
                 container.appendChild(unitElement);
             });
@@ -403,6 +414,15 @@
         function updateInfoPanel(unitId) {
             const data = unitData[unitId];
             
+            // Safety check for data availability before accessing properties
+            if (!data) {
+                document.getElementById('info-title').textContent = `Unit ${unitId} Details (Data Missing)`;
+                // Updated placeholder text to English
+                document.getElementById('owner-name').textContent = 'N/A (Data could not be parsed)';
+                document.getElementById('mailing-address').textContent = 'N/A (Data could not be parsed)';
+                return;
+            }
+
             document.getElementById('info-title').textContent = `Unit ${unitId} Details`;
             document.getElementById('owner-name').textContent = data.owner || 'N/A';
             document.getElementById('mailing-address').textContent = data.address || 'N/A';
@@ -420,7 +440,8 @@
                 '111', '112', '113', '114',
                 '115', '116', '117', '118',
                 '121', '122', '123', '124',
-                '125', '126', '127', '128',
+                '125', '126', 
+                '127', '128',
                 '131', '132', '133', '134',
                 '135', 'N/A', '137', '138' 
             ];
@@ -437,17 +458,15 @@
             ];
             renderMap('3160', 'grid-3160', map_3160);
             
-            // Automatically select the first unit to populate the info panel initially
-            const firstUnitId = map_3170.find(id => id !== 'N/A');
-            if (firstUnitId) {
-                const firstUnitElement = document.getElementById(`unit-${firstUnitId}`);
+            // Automatically select the first unit of BUILDING 2 (Unit 211)
+            const firstUnitId_3160 = map_3160.find(id => id !== 'N/A');
+            if (firstUnitId_3160) {
+                const firstUnitElement = document.getElementById(`unit-${firstUnitId_3160}`);
                 if (firstUnitElement) {
-                    handleUnitClick(firstUnitElement, firstUnitId);
+                    handleUnitClick(firstUnitElement, firstUnitId_3160);
                 }
             }
         };
     </script>
 </body>
 </html>
-
-
