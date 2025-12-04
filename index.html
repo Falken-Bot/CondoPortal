@@ -6,13 +6,14 @@
     <title>Matecumbe Key Property Portal</title>
     
     <!-- 
-        *** FIX: ALL external dependencies (like Tailwind CDN) have been removed. 
-        *** All styling is now internal standard CSS for maximum portability. 
+        *** FINAL FIX: NO EXTERNAL RESOURCES ARE USED. 
+        *** Custom font 'Inter' removed to guarantee identical rendering across all browsers/OS.
     -->
     <style>
         /* Base Colors & Typography */
         body {
-            font-family: 'Inter', sans-serif;
+            /* Using system default sans-serif font stack for max compatibility */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
             min-height: 100vh;
             padding: 1rem; /* p-4 */
             background-color: #f3f4f6; /* bg-gray-100 */
@@ -60,17 +61,17 @@
             width: 100%; 
         }
 
-        @media (min-width: 1024px) { /* Equivalent to Tailwind 'lg:' breakpoint */
+        @media (min-width: 1024px) { /* Desktop layout */
             #main-content-layout {
                 flex-direction: row; /* Two columns on desktop */
             }
 
             #map-section {
-                width: 66.666667%; /* lg:w-2/3 */
+                width: 66.666667%; /* 2/3 width */
             }
             
             #info-section {
-                width: 33.333333%; /* lg:w-1/3 */
+                width: 33.333333%; /* 1/3 width */
             }
             #info-panel {
                 position: sticky;
@@ -143,7 +144,7 @@
             border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s;
-            user-select: none;
+            user-select: none; /* Prevent text selection on click */
         }
 
         .unit:hover {
@@ -170,7 +171,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen p-4 md:p-8">
+<body>
 
     <div class="max-w-7xl mx-auto">
         <header class="text-center mb-10">
@@ -206,17 +207,17 @@
 
             <!-- Information Panel Section -->
             <div id="info-section">
-                <div id="info-panel">
+                <div id="info-panel" class="p-6 rounded-xl">
                     <h2 class="text-2xl font-bold mb-4 text-gray-800" id="info-title">Select a Unit</h2>
                     <div id="info-content" class="text-gray-700">
                         <p>Click on any unit in the map to the left to display the owner's details here.</p>
                         
                         <div class="mt-4 p-4 bg-gray-50 rounded-lg">
                             <h3 class="font-semibold text-indigo-600">Owner Name:</h3>
-                            <p id="owner-name" class="break-words italic text-gray-500">Awaiting selection...</p>
+                            <p id="owner-name" class="italic text-gray-500" style="word-break: break-word;">Awaiting selection...</p>
                             
                             <h3 class="font-semibold text-indigo-600 mt-3">Mailing Address:</h3>
-                            <p id="mailing-address" class="break-words italic text-gray-500">Awaiting selection...</p>
+                            <p id="mailing-address" class="italic text-gray-500" style="word-break: break-word;">Awaiting selection...</p>
                         </div>
                     </div>
                 </div>
@@ -362,7 +363,6 @@
                 const isDataAvailable = unitData[unit] !== undefined;
                 
                 const unitElement = document.createElement('div');
-                // Use custom classes defined in the internal <style> block
                 unitElement.className = `unit ${isDataAvailable && unit !== 'N/A' ? 'has-data' : 'inactive'}`;
                 unitElement.id = `unit-${unit}`;
                 unitElement.dataset.unitId = unit;
@@ -370,7 +370,6 @@
                 if (unit === 'N/A') {
                     // This is an empty placeholder to maintain the schematic grid structure
                     unitElement.textContent = ''; 
-                    // Special class for N/A placeholders
                     unitElement.classList.add('bg-gray-100'); 
                 } else {
                     unitElement.textContent = unit;
