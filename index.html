@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Matecumbe Key Property Portal</title>
     
-    <!-- 
-        *** FIX 6: Addressed visual feedback about Building 3160 being "grayed out".
-        1. Changed the default background for interactive units from white to a subtle light blue (#f7f8ff) 
-           to visually distinguish them as clickable elements against the map background.
-        2. Updated window.onload to automatically select Unit 211 (Building 3160) to confirm that the 
-           second building is interactive and correctly functioning immediately upon load.
-    -->
     <style>
         /* Base Colors & Typography */
         body {
@@ -97,6 +90,12 @@
         .text-indigo-600 { color: #4f46e5; }
         .italic { font-style: italic; }
         .text-gray-500 { color: #6b7280; }
+        
+        /* Tailwind-based colors for checkbox labels */
+        .text-orange-600 { color: #f97316; }
+        .text-blue-600 { color: #3b82f6; }
+        .text-red-600 { color: #ef4444; }
+
 
         /* Unit Map Container Grid */
         .unit-map-container {
@@ -174,6 +173,51 @@
             background-color: #f3f4f6; 
             border-style: dashed;
         }
+
+        /* Market Status Colors */
+        /* 1. For Sale (Orange) */
+        .unit.for-sale {
+            background-color: #f97316; /* orange-600 */
+            color: #fff;
+            border-color: #ea580c; /* orange-700 */
+        }
+
+        /* 2. Rental (Blue) */
+        .unit.rental {
+            background-color: #3b82f6; /* blue-500 */
+            color: #fff;
+            border-color: #2563eb; /* blue-600 */
+        }
+        
+        /* 3. NEW: Both Active (Red) - This selector takes precedence */
+        .unit.for-sale.rental {
+            background-color: #ef4444; /* red-500 */
+            color: #fff;
+            border-color: #dc2626; /* red-600 */
+        }
+        
+        /* Styling for the checkbox section */
+        .market-status-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px dashed #d1d5db; /* gray-300 */
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+        .checkbox-group input[type="checkbox"] {
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+        .checkbox-group label {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -224,6 +268,23 @@
                             <h3 class="font-semibold text-indigo-600 mt-3">Mailing Address:</h3>
                             <p id="mailing-address" class="italic text-gray-500" style="word-break: break-word;">Awaiting selection...</p>
                         </div>
+                        
+                        <!-- NEW: Market Status Controls -->
+                        <div id="market-status-section" class="market-status-controls">
+                            <h3 class="font-semibold text-indigo-600">Market Status:</h3>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="for-sale-checkbox">
+                                <label for="for-sale-checkbox" class="text-orange-600">For Sale (Orange)</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="rental-checkbox">
+                                <label for="rental-checkbox" class="text-blue-600">Rental (Blue)</label>
+                            </div>
+                            <div class="checkbox-group mt-2">
+                                <label class="text-red-600 font-bold">Both checked = Red</label>
+                            </div>
+                        </div>
+                        
                     </div>
                 </div>
             </div>
@@ -259,10 +320,10 @@
 3160 MATECUMBE KEY RD 236 PUNTA GORDA FL 33955 FLAHERTY JEFFREY SCOTT 905 CROSSING DR COVINGTON KY 41017
 3160 MATECUMBE KEY RD 237 PUNTA GORDA FL 33955 AMMONS MAURICE ALLEN III + AMMONS DEBRA ENGLERT 1613 ST THOMAS DR MIDLOTHIAN VA 23114
 3160 MATECUMBE KEY RD 238 PUNTA GORDA FL 33955 BASHAM DAVID W L/E 4581 N PASEO DE LOS CERRITOS TUCSON AZ 85745
-3160 MATECUMBE KEY RD 223 PUNTA GORDA FL 33955 WTFRENTALS LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
+3160 MATECUMBE KEY RD 223 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
 3160 MATECUMBE KEY RD 224 PUNTA GORDA FL 33955 LEGER GERALD F & AMY L 25 ERIE LN GROTON CT 06340
 3160 MATECUMBE KEY RD 225 PUNTA GORDA FL 33955 MARSHALL LARRY 3160 MATECUMBE KEY RD #225 PUNTA GORDA FL 33955
-3160 MATECUMBE KEY RD 226 PUNTA GORDA FL 33955 WTFRENTALS LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
+3160 MATECUMBE KEY RD 226 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
 3160 MATECUMBE KEY RD 227 PUNTA GORDA FL 33955 STEFANSKI PETER 3605 S MAYFIELD RD JACKSON WI 53037
 3160 MATECUMBE KEY RD 228 PUNTA GORDA FL 33955 BADILLO LUIS & SANDRA 3160 MATECUMBE KEY RD #228 PUNTA GORDA FL 33955
 3160 MATECUMBE KEY RD 231 PUNTA GORDA FL 33955 HARWOOD GERALD W & HARWOOD JACQUELYN H 5198 ARROWWOOD DR PARK CITY UT 84098
@@ -273,12 +334,12 @@
 3160 MATECUMBE KEY RD 212 PUNTA GORDA FL 33955 SCOTT JOSEPH & TERRI LYNN 7996 AQUA ISLE CLAY MI 48001
 3160 MATECUMBE KEY RD 213 PUNTA GORDA FL 33955 ANTHONSEN GARY 3797 PLUECKHAHN LANDINGS CIR PUNTA GORDA FL 33955
 3160 MATECUMBE KEY RD 214 PUNTA GORDA FL 33955 LALONE DEREK J & NANETTE M 7779 COLONY DR CLAY MI 48001
-3160 MATECUMBE KEY RD 215 PUNTA GORDA FL 33955 WTFRENTALS LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
+3160 MATECUMBE KEY RD 215 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
 3160 MATECUMBE KEY RD 216 PUNTA GORDA FL 33955 WHELAN WILLIAM W & WHELAN BARBARA W TR TRUST 3245 SUGARLOAF KEY RD #216 PUNTA GORDA FL 33955
 3160 MATECUMBE KEY RD 217 PUNTA GORDA FL 33955 WEGENER JAMES W & BEVERLY S 9624 DUNES DR FORT PIERCE SD 57532
 3160 MATECUMBE KEY RD 218 PUNTA GORDA FL 33955 TANNOUS BETH ANN 3160 MATECUMBE KEY RD #218 PUNTA GORDA FL 33955
 3160 MATECUMBE KEY RD 221 PUNTA GORDA FL 33955 JOE S AUTOWHOLESALE INC 5708 RALEIGH DR NORFOLK VA 23502
-3160 MATECUMBE KEY RD 222 PUNTA GORDA FL 33955 WTFRENTALS LLC 27W070 80TH ST NAPERVILLE IL 60565`;
+3160 MATECUMBE KEY RD 222 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 27W070 80TH ST NAPERVILLE IL 60565`;
 
         let unitData = {};
         let activeUnit = null;
@@ -291,31 +352,24 @@
             const dataMap = {};
 
             lines.forEach(line => {
-                // FIX: Made the comma after the unit number optional with ',?' (e.g., '126,' or '211 ')
-                // This resolves the parsing issue for Building 3160 data which lacked the comma.
                 const propertyAddressMatch = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3}),?\s*Punta GORDA FL\s*(\d{5})/i);
 
                 if (propertyAddressMatch) {
-                    // propertyAddressMatch[0] is the entire matched string, e.g., "3170 MATECUMBE KEY RD 126, Punta GORDA FL 33573"
                     const fullPropertyAddress = propertyAddressMatch[0]; 
-                    const unitId = propertyAddressMatch[2];             // The unit number (e.g., '126' or '211')
+                    const unitId = propertyAddressMatch[2];
                     
                     const fullMatchIndex = line.indexOf(fullPropertyAddress);
                     
-                    // Calculate the index where the owner name/mailing address begins
                     const ownerDataStart = fullMatchIndex + fullPropertyAddress.length; 
                     
-                    // The raw string that contains the owner and mailing address
                     const ownerAddressRaw = line.substring(ownerDataStart).trim();
 
                     let ownerName = '';
                     let mailingAddress = ownerAddressRaw;
 
-                    // Try to separate name and address based on delimiters or the start of the street address number
                     const delimiters = ['—', ' L/E ', ' TR ', ' LLC ', ' INC ', ' ET AL '];
                     let delimiterIndex = -1;
 
-                    // Find the first occurrence of a strong delimiter
                     for (const delim of delimiters) {
                         const index = ownerAddressRaw.toUpperCase().indexOf(delim);
                         if (index > -1 && (delimiterIndex === -1 || index < delimiterIndex)) {
@@ -324,27 +378,22 @@
                     }
 
                     if (delimiterIndex > -1) {
-                        // Extract owner name up to the delimiter
                         ownerName = ownerAddressRaw.substring(0, delimiterIndex).trim();
                         
-                        // Extract mailing address after the delimiter
                         const delimiterUsed = delimiters.find(delim => ownerAddressRaw.toUpperCase().substring(delimiterIndex).startsWith(delim));
                         mailingAddress = ownerAddressRaw.substring(delimiterIndex + (delimiterUsed ? delimiterUsed.length : 0)).trim().replace('—', '').trim();
 
                     } else {
-                        // If no clear delimiter, split by the first appearance of a number which usually starts the street address
                         const firstDigitIndex = ownerAddressRaw.search(/\d/);
                         if (firstDigitIndex > 10) { 
                             ownerName = ownerAddressRaw.substring(0, firstDigitIndex).trim();
                             mailingAddress = ownerAddressRaw.substring(firstDigitIndex).trim();
                         } else {
-                            // Fallback: use the whole raw string as the owner name, flag address as needing manual check
                             ownerName = ownerAddressRaw;
                             mailingAddress = "Missing mailing address in source data, or format requires manual review.";
                         }
                     }
                     
-                    // Final cleanups
                     ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
                     mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
 
@@ -372,15 +421,12 @@
                 let classes = 'unit';
 
                 if (unit === 'N/A') {
-                    // Placeholder unit - inactive, special gray background, no text
                     classes += ' inactive bg-gray-100';
                     unitElement.textContent = ''; 
                 } else if (!isDataAvailable) {
-                    // Unit exists in map but no data was parsed - inactive/gray
                     classes += ' inactive';
                     unitElement.textContent = unit;
                 } else {
-                    // Unit has data - interactive, defaults to the light blue background
                     unitElement.textContent = unit;
                     unitElement.addEventListener('click', () => handleUnitClick(unitElement, unit));
                 }
@@ -392,6 +438,94 @@
                 container.appendChild(unitElement);
             });
         }
+
+        /**
+         * Loads market status for a unit from localStorage.
+         * @param {string} unitId 
+         * @returns {{forSale: boolean, rental: boolean}}
+         */
+        function loadMarketStatus(unitId) {
+            // Using try/catch for robust localStorage access
+            try {
+                const status = localStorage.getItem(`marketStatus-${unitId}`);
+                return status ? JSON.parse(status) : { forSale: false, rental: false };
+            } catch (error) {
+                console.error("Error loading status from localStorage:", error);
+                return { forSale: false, rental: false };
+            }
+        }
+
+        /**
+         * Saves market status for a unit to localStorage.
+         * @param {string} unitId 
+         * @param {{forSale: boolean, rental: boolean}} status 
+         */
+        function saveMarketStatus(unitId, status) {
+            try {
+                localStorage.setItem(`marketStatus-${unitId}`, JSON.stringify(status));
+            } catch (error) {
+                console.error("Could not save to localStorage:", error);
+            }
+        }
+        
+        /**
+         * Applies the correct color classes to a unit element based on its market status.
+         * @param {string} unitId 
+         * @param {{forSale: boolean, rental: boolean}} status 
+         */
+        function updateUnitColor(unitId, status) {
+            const unitElement = document.getElementById(`unit-${unitId}`);
+            if (!unitElement || unitElement.classList.contains('inactive')) return;
+
+            // Remove existing market classes
+            unitElement.classList.remove('for-sale', 'rental');
+
+            // Apply new classes
+            if (status.forSale) {
+                unitElement.classList.add('for-sale');
+            }
+            if (status.rental) {
+                unitElement.classList.add('rental');
+            }
+        }
+        
+        /**
+         * Sets up the interactive controls for market status when a unit is selected.
+         * @param {string} unitId 
+         */
+        function setupMarketStatusControls(unitId) {
+            const currentStatus = loadMarketStatus(unitId);
+            const saleCheckbox = document.getElementById('for-sale-checkbox');
+            const rentalCheckbox = document.getElementById('rental-checkbox');
+
+            // 1. Set initial state of checkboxes
+            saleCheckbox.checked = currentStatus.forSale;
+            rentalCheckbox.checked = currentStatus.rental;
+            
+            // 2. Clear previous listeners (Crucial to prevent multiple listeners on the same element)
+            saleCheckbox.onchange = null;
+            rentalCheckbox.onchange = null;
+
+            // 3. Attach new listeners
+            const saveHandler = () => {
+                const newStatus = {
+                    forSale: saleCheckbox.checked,
+                    rental: rentalCheckbox.checked
+                };
+                saveMarketStatus(unitId, newStatus);
+                updateUnitColor(unitId, newStatus);
+                
+                // Ensure the currently selected unit retains its 'active' border/style
+                const activeElement = document.getElementById(`unit-${unitId}`);
+                if (activeElement && !activeElement.classList.contains('active')) {
+                     activeElement.classList.add('active');
+                }
+            };
+
+            saleCheckbox.onchange = saveHandler;
+            rentalCheckbox.onchange = saveHandler;
+        }
+
 
         /**
          * Handles the click event on a unit.
@@ -406,6 +540,9 @@
 
             // Update info panel
             updateInfoPanel(unitId);
+            
+            // Setup market status controls for the newly selected unit
+            setupMarketStatusControls(unitId);
         }
 
         /**
@@ -417,11 +554,16 @@
             // Safety check for data availability before accessing properties
             if (!data) {
                 document.getElementById('info-title').textContent = `Unit ${unitId} Details (Data Missing)`;
-                // Updated placeholder text to English
                 document.getElementById('owner-name').textContent = 'N/A (Data could not be parsed)';
                 document.getElementById('mailing-address').textContent = 'N/A (Data could not be parsed)';
+                
+                // Hide or disable market controls if data is missing
+                document.getElementById('market-status-section').style.display = 'none';
                 return;
             }
+            
+            // Show market controls if data is available
+            document.getElementById('market-status-section').style.display = 'flex';
 
             document.getElementById('info-title').textContent = `Unit ${unitId} Details`;
             document.getElementById('owner-name').textContent = data.owner || 'N/A';
@@ -434,8 +576,6 @@
             unitData = parseData();
 
             // Unit lists are manually ordered for a clean, 4x6 grid layout (24 slots each).
-            
-            // Building 3170 Map Layout (100 series) - 23 units + 1 placeholder = 24 total slots
             const map_3170 = [
                 '111', '112', '113', '114',
                 '115', '116', '117', '118',
@@ -447,7 +587,6 @@
             ];
             renderMap('3170', 'grid-3170', map_3170);
             
-            // Building 3160 Map Layout (200 series) - 24 units = 24 total slots
             const map_3160 = [
                 '211', '212', '213', '214', 
                 '215', '216', '217', '218',
@@ -458,6 +597,12 @@
             ];
             renderMap('3160', 'grid-3160', map_3160);
             
+            // Apply colors from localStorage after rendering
+            [...map_3170, ...map_3160].filter(id => id !== 'N/A').forEach(unitId => {
+                const status = loadMarketStatus(unitId);
+                updateUnitColor(unitId, status);
+            });
+
             // Automatically select the first unit of BUILDING 2 (Unit 211)
             const firstUnitId_3160 = map_3160.find(id => id !== 'N/A');
             if (firstUnitId_3160) {
@@ -470,4 +615,3 @@
     </script>
 </body>
 </html>
-
