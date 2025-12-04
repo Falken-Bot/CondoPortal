@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matecumbe Key Property Portal - Real-Time Status</title>
+    <title>Matecumbe Key Property Viewer - Static Data</title>
     
     <style>
         /* Base Colors & Typography (Using standard Tailwind-like classes) */
@@ -27,7 +27,6 @@
         .text-center { text-align: center; }
         .mb-10 { margin-bottom: 2.5rem; }
         .mt-2 { margin-top: 0.5rem; }
-        .mt-3 { margin-top: 0.75rem; }
         .mt-4 { margin-top: 1rem; }
         .p-6 { padding: 1.5rem; }
         .p-4 { padding: 1rem; }
@@ -83,8 +82,6 @@
         .font-bold { font-weight: 700; }
         .text-gray-800 { color: #1f2937; }
         .text-indigo-600 { color: #4f46e5; }
-        .italic { font-style: italic; }
-        .text-gray-500 { color: #6b7280; }
         
         /* Unit Map Container Grid */
         .unit-map-container {
@@ -108,6 +105,7 @@
             color: #4f46e5; 
             padding: 0.5rem; 
             background-color: #e0e7ff; 
+            border-radius: 6px 6px 0 0;
         }
         
         /* Building Grid (4 columns inside each building) */
@@ -117,7 +115,8 @@
             gap: 4px;
             padding: 16px;
             border: 2px solid #6366f1; 
-            border-radius: 12px;
+            border-top: none;
+            border-radius: 0 0 12px 12px;
             background-color: #eef2ff; 
         }
 
@@ -135,11 +134,10 @@
             cursor: pointer;
             transition: all 0.2s;
             user-select: none; 
-            opacity: 0.8; /* Slightly less opaque until data confirms it's not inactive */
         }
 
         .unit:hover:not(.inactive) {
-            background-color: #fcd34d; 
+            background-color: #d1d5db; 
             transform: scale(1.05);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
@@ -147,7 +145,7 @@
         .unit.active {
             box-shadow: 0 0 0 4px #818cf8, 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* Highlighted active state */
             transform: scale(1.02);
-            opacity: 1;
+            background-color: #c7d2fe;
         }
 
         .unit.inactive {
@@ -161,57 +159,6 @@
             background-color: #f3f4f6; 
             border-style: dashed;
         }
-
-        /* Market Status Colors */
-        .unit.for-sale {
-            background-color: #f97316; /* Orange */
-            color: #fff;
-            border-color: #ea580c; 
-            opacity: 1;
-        }
-
-        .unit.rental {
-            background-color: #3b82f6; /* Blue */
-            color: #fff;
-            border-color: #2563eb; 
-            opacity: 1;
-        }
-        
-        /* Both Active (Red) - Highest precedence */
-        .unit.for-sale.rental {
-            background-color: #ef4444; /* Red */
-            color: #fff;
-            border-color: #dc2626; 
-            opacity: 1;
-        }
-        
-        /* Styling for the checkbox section */
-        .market-status-controls {
-            display: none; /* Hide until logic determines if enabled or disabled message should show */
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px dashed #d1d5db; 
-        }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 600;
-        }
-        .checkbox-group input[type="checkbox"] {
-            transform: scale(1.2);
-            cursor: pointer;
-        }
-        .checkbox-group label {
-            cursor: pointer;
-        }
-        
-        /* Tailwind-based colors for checkbox labels */
-        .text-orange-600 { color: #f97316; }
-        .text-blue-600 { color: #3b82f6; }
-        .text-red-600 { color: #ef4444; }
     </style>
 </head>
 <body>
@@ -219,13 +166,8 @@
     <div class="max-w-7xl mx-auto">
         <header class="text-center mb-10">
             <h1 class="text-4xl font-extrabold text-indigo-700">Matecumbe Key Unit Map</h1>
-            <p class="text-lg text-gray-600 mt-2">Click a unit to view owner information and set market status.</p>
+            <p class="text-lg text-gray-600 mt-2">Click a unit to view owner information from the static property records.</p>
         </header>
-
-        <!-- Status Message & User ID -->
-        <div id="status-message" class="text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800">
-            Initializing application and connecting to database...
-        </div>
 
         <!-- Main Content Area -->
         <div id="main-content-layout">
@@ -282,39 +224,15 @@
                             </div>
 
                         </div>
-                        
-                        <!-- Market Status Controls -->
-                        <div id="market-status-section" class="market-status-controls">
-                            <!-- Content will be injected by JavaScript based on isRealtimeEnabled -->
-                        </div>
-                        
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    <script type="text/javascript">
         
-        let db, auth;
-        let isAuthReady = false; // Auth status check is complete
-        let isRealtimeEnabled = false; // Flag for active database connection and saving ability
-        let userId = null;
-        let allUnitStatuses = {}; // Global state for market statuses from Firestore
-        let activeUnitId = null; // Store the ID of the currently selected unit
-
-        // Set log level to see Firebase internal logs (helpful for debugging)
-        setLogLevel('Debug');
-
-        // This is the REAL FUCKING DATA that was previously provided, now correctly used.
+        // This is the REAL FUCKING DATA that was previously provided.
         const RAW_DATA = `3170 MATECUMBE KEY RD 111, Punta Gorda FL 33955 WYNNIK DARREN T + WYNNIK HEATHER Z — 3553 Potato Garden Run Rd, Imperial PA 15126
 3170 MATECUMBE KEY RD 112, Punta Gorda FL 33955 FUNK SHEILA TR (For Sheila Funk Trust) — 473 Edgewater Dr, Morris IL 60450
 3170 MATECUMBE KEY RD 113, Punta Gorda FL 33955 ENGKJER WANE S TR (For Waterfront Trust) — 51628 Pelican Point Dr, Detroit Lakes MN 56501
@@ -364,159 +282,8 @@
 3160 MATECUMBE KEY RD 222 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 27W070 80TH ST NAPERVILLE IL 60565`;
 
 
-        let unitInfoData = {}; 
-
-        // --- Firebase Setup and Real-Time Listener ---
-
-        /**
-         * Initializes Firebase and returns a Promise that resolves when authentication is complete.
-         */
-        function initializeFirebase() {
-            return new Promise((resolve, reject) => {
-                const statusMessageElement = document.getElementById('status-message');
-
-                // Check 1: Configuration must be present and valid
-                if (!firebaseConfig || !firebaseConfig.apiKey) {
-                    statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800';
-                    statusMessageElement.textContent = 'Firebase configuration missing. Real-time features disabled (Read-Only Mode).';
-                    isAuthReady = true;
-                    isRealtimeEnabled = false;
-                    resolve();
-                    return;
-                }
-
-                try {
-                    const app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
-
-                    // 1. Sign in (anonymously or with custom token)
-                    const signInPromise = initialAuthToken 
-                        ? signInWithCustomToken(auth, initialAuthToken) 
-                        : signInAnonymously(auth);
-
-                    signInPromise.catch((error) => {
-                        console.error("Sign-in failed:", error);
-                        statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                        statusMessageElement.textContent = 'Authentication failed. Status updates will not be saved (Read-Only Mode).';
-                        isAuthReady = true;
-                        isRealtimeEnabled = false;
-                        resolve();
-                    });
-
-                    // 2. Wait for the Auth State to change
-                    const unsubscribe = onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            userId = user.uid;
-                            isAuthReady = true;
-                            isRealtimeEnabled = true; // Success!
-                            
-                            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
-                            statusMessageElement.textContent = `Connected (User: ${userId}). Status updates are real-time.`;
-                            
-                            unsubscribe(); 
-                            
-                            startRealTimeStatusListener();
-                            resolve();
-                        } else {
-                            // Only fires if sign-in fails or is not yet complete
-                            if (!isAuthReady) {
-                                isAuthReady = true;
-                                isRealtimeEnabled = false;
-                                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                                statusMessageElement.textContent = 'Authentication failed. Status updates will not be saved (Read-Only Mode).';
-                                resolve();
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.error("Firebase initialization failed:", error);
-                    document.getElementById('status-message').className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                    document.getElementById('status-message').textContent = 'Critical error connecting to database (Read-Only Mode).';
-                    isAuthReady = true;
-                    isRealtimeEnabled = false;
-                    reject(error);
-                }
-            });
-        }
-        
-        /**
-         * Gets the Firestore collection reference for public unit statuses.
-         */
-        function getUnitStatusCollectionRef() {
-            if (!db) return null;
-            // Public data path: /artifacts/{appId}/public/data/{collectionName}
-            const collectionPath = `artifacts/${appId}/public/data/unitStatuses`;
-            return collection(db, collectionPath);
-        }
-
-        /**
-         * Starts the real-time listener for unit statuses.
-         */
-        function startRealTimeStatusListener() {
-            const unitStatusColRef = getUnitStatusCollectionRef();
-            if (!unitStatusColRef) return;
-            
-            // Listen for changes across the entire 'unitStatuses' collection
-            onSnapshot(unitStatusColRef, (snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added" || change.type === "modified") {
-                        const unitId = change.doc.id;
-                        const status = change.doc.data();
-                        
-                        // 1. Update the global state
-                        allUnitStatuses[unitId] = status;
-                        
-                        // 2. Update the unit square color on the map
-                        updateUnitColor(unitId, status);
-                        
-                        // 3. If the changed unit is the currently selected one, update the checkbox UI
-                        if (unitId === activeUnitId) {
-                            updateInfoPanel(unitId); // Re-run to update checkboxes and info
-                        }
-                    } else if (change.type === "removed") {
-                        // Clear status if removed
-                        const unitId = change.doc.id;
-                        allUnitStatuses[unitId] = { forSale: false, rental: false };
-                        updateUnitColor(unitId, { forSale: false, rental: false });
-                    }
-                });
-            }, (error) => {
-                console.error("Firestore listening failed:", error);
-            });
-        }
-
-        /**
-         * Saves market status for a unit to Firestore.
-         * @param {string} unitId 
-         * @param {{forSale: boolean, rental: boolean}} status 
-         */
-        async function saveMarketStatus(unitId, status) {
-            if (!isRealtimeEnabled || !db || !userId) {
-                console.warn("Real-time saving is disabled. Cannot save status.");
-                // Provide visual feedback if saving is attempted when disabled
-                const marketSection = document.getElementById('market-status-section');
-                marketSection.innerHTML = `<h3 class="font-semibold text-indigo-600">Market Status:</h3><p class="text-red-600 text-sm mt-1 font-bold">SAVING DISABLED: Checkbox state not saved. Reload the page if connection restores.</p>`;
-                setTimeout(() => updateInfoPanel(unitId), 3000); // Revert UI after 3s
-                return;
-            }
-            try {
-                // Ensure data is valid before saving
-                const dataToSave = { 
-                    forSale: !!status.forSale, 
-                    rental: !!status.rental 
-                };
-                
-                const docRef = doc(getUnitStatusCollectionRef(), unitId);
-                // setDoc merges existing data if the document already exists
-                await setDoc(docRef, dataToSave, { merge: true }); 
-                
-            } catch (error) {
-                console.error("FATAL ERROR: Failed to save market status to Firestore. Check security rules or connection:", error);
-            }
-        }
-        
-        // --- UI and Data Logic ---
+        let unitInfoData = {}; // Stores the parsed static data
+        let activeUnitId = null; // Store the ID of the currently selected unit
 
         /**
          * Parses the raw text data into a structured JavaScript object.
@@ -538,7 +305,7 @@
                     let ownerName = '';
                     let mailingAddress = ownerAddressRaw;
 
-                    // Improved logic for splitting Owner Name from Mailing Address
+                    // Logic for splitting Owner Name from Mailing Address based on delimiters
                     const delimiters = ['—', ' L/E ', ' TR ', ' LLC ', ' INC ', ' ET AL ', ' & ', ' FOR '];
                     let delimiterIndex = -1;
                     let delimiterFound = false;
@@ -559,14 +326,13 @@
                         // Clean up mailing address start
                         mailingAddress = ownerAddressRaw.substring(delimiterIndex + (delimiterUsed ? delimiterUsed.length : 0)).trim().replace('—', '').trim();
                         
-                        // Heuristic for simple case where name just precedes the first digit of the mailing address
                     } else {
+                        // Default fallback if no delimiter is clearly found
                         const firstDigitIndex = ownerAddressRaw.search(/\d/);
                         if (firstDigitIndex > 10) { 
                             ownerName = ownerAddressRaw.substring(0, firstDigitIndex).trim();
                             mailingAddress = ownerAddressRaw.substring(firstDigitIndex).trim();
                         } else {
-                            // Default fallback
                             ownerName = ownerAddressRaw;
                             mailingAddress = "Missing mailing address or format requires manual review.";
                         }
@@ -576,13 +342,12 @@
                     ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
                     mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
 
-                    // NOTE: Phone and Email are not present in the RAW_DATA property records, so they are null.
                     dataMap[unitId] = {
                         building: propertyAddressMatch[1],
                         owner: ownerName,
                         address: mailingAddress,
-                        phone: null, // Placeholder for future expansion
-                        email: null  // Placeholder for future expansion
+                        phone: null, 
+                        email: null  
                     };
                 }
             });
@@ -610,6 +375,7 @@
                     unitElement.textContent = unit;
                 } else {
                     unitElement.textContent = unit;
+                    // Only attach click handler if data is available
                     unitElement.addEventListener('click', () => handleUnitClick(unitElement, unit));
                 }
 
@@ -621,92 +387,6 @@
             });
         }
         
-        /**
-         * Applies the correct color classes to a unit element based on its market status.
-         */
-        function updateUnitColor(unitId, status) {
-            const unitElement = document.getElementById(`unit-${unitId}`);
-            if (!unitElement || unitElement.classList.contains('inactive')) return;
-
-            // Remove existing market classes
-            unitElement.classList.remove('for-sale', 'rental');
-
-            // Apply new classes
-            if (status && status.forSale) {
-                unitElement.classList.add('for-sale');
-            }
-            if (status && status.rental) {
-                unitElement.classList.add('rental');
-            }
-        }
-        
-        /**
-         * Renders the market status controls (either checkboxes or a disabled message).
-         */
-        function renderMarketStatusControls(unitId, marketSection) {
-            const currentStatus = allUnitStatuses[unitId] || { forSale: false, rental: false };
-            marketSection.style.display = 'flex';
-            
-            if (isRealtimeEnabled) {
-                // Render active checkboxes
-                marketSection.style.flexDirection = 'column';
-                marketSection.innerHTML = `
-                    <h3 class="font-semibold text-indigo-600">Market Status (Real-Time):</h3>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="for-sale-checkbox" ${currentStatus.forSale ? 'checked' : ''}>
-                        <label for="for-sale-checkbox" class="text-orange-600">For Sale (Orange)</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="rental-checkbox" ${currentStatus.rental ? 'checked' : ''}>
-                        <label for="rental-checkbox" class="text-blue-600">Rental (Blue)</label>
-                    </div>
-                    <div class="checkbox-group mt-2">
-                        <label class="text-red-600 font-bold">Both checked = Red</label>
-                    </div>
-                `;
-                // Set up listeners after elements are created
-                setupMarketStatusListeners(unitId);
-            } else {
-                // Render disabled message (Read-Only Mode)
-                marketSection.style.flexDirection = 'column';
-                marketSection.innerHTML = `
-                    <h3 class="font-semibold text-indigo-600">Market Status:</h3>
-                    <div class="p-3 bg-red-50 border border-red-300 rounded-lg">
-                        <p class="text-red-700 font-bold text-sm">
-                            <span style="font-size: 1.2em;">&#9888;</span> Saving Disabled
-                        </p>
-                        <p class="text-gray-600 text-xs mt-1">
-                            Unit status cannot be updated due to database connection issues (Read-Only Mode).
-                        </p>
-                    </div>
-                `;
-            }
-        }
-
-        /**
-         * Sets up the event listeners for the market status checkboxes.
-         */
-        function setupMarketStatusListeners(unitId) {
-            const saleCheckbox = document.getElementById('for-sale-checkbox');
-            const rentalCheckbox = document.getElementById('rental-checkbox');
-            
-            if (!saleCheckbox || !rentalCheckbox) return;
-
-            // Attach new listeners
-            const saveHandler = () => {
-                const newStatus = {
-                    forSale: saleCheckbox.checked,
-                    rental: rentalCheckbox.checked
-                };
-                // Call async save function
-                saveMarketStatus(unitId, newStatus);
-                // UI update will be handled by the onSnapshot listener when the data syncs
-            };
-
-            saleCheckbox.onchange = saveHandler;
-            rentalCheckbox.onchange = saveHandler;
-        }
-
         /**
          * Handles the click event on a unit.
          */
@@ -720,17 +400,15 @@
             // 3. Set new active unit
             element.classList.add('active');
 
-            // 4. Update info panel (including checkbox state/listeners)
+            // 4. Update info panel
             updateInfoPanel(unitId);
         }
 
         /**
-         * Updates the information panel with data for the selected unit and sets up controls.
+         * Updates the information panel with data for the selected unit.
          */
         function updateInfoPanel(unitId) {
             const data = unitInfoData[unitId];
-            const marketSection = document.getElementById('market-status-section');
-            marketSection.className = 'market-status-controls'; // Ensure base class is set
 
             if (!data) {
                 document.getElementById('info-title').textContent = `Unit ${unitId} Details (Data Missing)`;
@@ -738,7 +416,6 @@
                 document.getElementById('mailing-address').textContent = 'N/A';
                 document.getElementById('phone-number').textContent = 'N/A (No contact data available)';
                 document.getElementById('email-address').textContent = 'N/A (No contact data available)';
-                marketSection.style.display = 'none';
                 return;
             }
             
@@ -746,19 +423,15 @@
             document.getElementById('owner-name').textContent = data.owner || 'N/A';
             document.getElementById('mailing-address').textContent = data.address || 'N/A';
             
-            // These fields were present in the mock data, but are not in the RAW_DATA.
-            // They are set to a default message here.
+            // These fields are placeholders as they are not in the raw data
             document.getElementById('phone-number').textContent = data.phone || 'N/A (Not in static property data)';
             document.getElementById('email-address').textContent = data.email || 'N/A (Not in static property data)';
-            
-            // Render controls or disabled message based on connection status
-            renderMarketStatusControls(unitId, marketSection);
         }
 
 
         // --- Main Application Start ---
-        window.onload = async function() {
-            // 1. Parse static data first
+        window.onload = function() {
+            // 1. Parse static data
             unitInfoData = parseData();
 
             // 2. Define unit maps
@@ -784,14 +457,7 @@
             renderMap('grid-3170', map_3170);
             renderMap('grid-3160', map_3160);
 
-            // 4. Initialize Firebase and wait for auth to complete
-            try {
-                await initializeFirebase();
-            } catch (e) {
-                console.error("Initialization error:", e);
-            }
-            
-            // 5. Select a default unit (guaranteed to run after auth is stable)
+            // 4. Select a default unit for display
             const defaultUnitId = '211';
             const defaultUnitElement = document.getElementById(`unit-${defaultUnitId}`);
             if (defaultUnitElement) {
