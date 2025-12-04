@@ -286,18 +286,6 @@
 
         // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        
-        let firebaseConfig = {};
-        // Attempt to parse config robustly
-        if (typeof __firebase_config === 'string' && __firebase_config.trim() !== '') {
-            try {
-                firebaseConfig = JSON.parse(__firebase_config);
-            } catch (e) {
-                console.error("CRITICAL ERROR: Failed to parse __firebase_config JSON:", e);
-                // firebaseConfig remains {} on error
-            }
-        }
-        
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         let db, auth;
@@ -309,6 +297,11 @@
 
         // Set log level to see Firebase internal logs (helpful for debugging)
         setLogLevel('Debug');
+        
+        // Helper function for a small delay
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
 
         // --- STATIC RAW DATA (RETAINED) ---
         const RAW_DATA = `3170 MATECUMBE KEY RD 111, Punta Gorda FL 33955 WYNNIK DARREN T + WYNNIK HEATHER Z — 3553 Potato Garden Run Rd, Imperial PA 15126
@@ -375,6 +368,35 @@
         }
 
         /**
+         * Parses the Firebase configuration from the global environment variable.
+         * Tries to wait for the configuration to be injected.
+         * @returns {Promise<Object>} The parsed firebase config object.
+         */
+        async function getFirebaseConfigWithRetry(retries = 5, delay = 100) {
+            let firebaseConfig = {};
+            const statusMessageElement = document.getElementById('status-message');
+
+            for (let i = 0; i < retries; i++) {
+                if (typeof __firebase_config === 'string' && __firebase_config.trim() !== '') {
+                    try {
+                        firebaseConfig = JSON.parse(__firebase_config);
+                        if (firebaseConfig.apiKey) {
+                            console.log("Firebase config found and parsed.");
+                            return firebaseConfig;
+                        }
+                    } catch (e) {
+                        console.error("CRITICAL ERROR: Failed to parse __firebase_config JSON:", e);
+                        break; // Stop retrying if parsing fails
+                    }
+                }
+                statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${i + 1}/${retries})`;
+                await sleep(delay);
+            }
+            return {}; // Return empty object if all retries fail
+        }
+
+
+        /**
          * Initializes Firebase and returns a Promise that resolves when authentication is complete.
          */
         async function initializeFirebase() {
@@ -382,7 +404,10 @@
             statusMessageElement.textContent = 'Connecting to database...';
             statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800';
 
-            // CRITICAL CHECK: Ensure the parsed config is valid
+            // 1. Get configuration, waiting with retry logic
+            const firebaseConfig = await getFirebaseConfigWithRetry();
+
+            // 2. CRITICAL CHECK: Ensure the parsed config is valid
             if (!firebaseConfig || !firebaseConfig.apiKey) {
                 const msg = 'CONFIGURATION MISSING: Real-time features disabled. Please ensure the hosting environment provides a valid Firebase config.';
                 console.error(msg);
@@ -396,7 +421,7 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // Use direct await for sign-in
+                // 3. Authenticate
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                     console.log("Signed in with custom token successfully.");
@@ -417,7 +442,7 @@
                     
                     startRealTimeStatusListener();
                 } else {
-                    // This block catches the authentication failure reported by the user
+                    // This block catches the authentication failure
                     throw new Error("User object is null after sign-in attempt (Authentication Failed).");
                 }
 
@@ -796,6 +821,7 @@
 
             // 4. Initialize Firebase and wait for auth to complete
             try {
+                // Now uses retry logic to wait for configuration injection
                 await initializeFirebase();
             } catch (e) {
                 console.error("Initialization error:", e);
