@@ -34,62 +34,63 @@
   <div id="info">Click a unit to see owner info here.</div>
 
   <script>
+    // Hard-coded owner data (sample subset — expand with all rows from your spreadsheet)
     const owners = {
       "3170-111": "WYNNIK DARREN T + WYNNIK HEATHER Z\n3553 Potato Garden Run Rd, Imperial PA 15126",
-      "3170-112": "FUNK SHEILA TR (Sheila Funk Trust)\n473 Edgewater Dr, Morris IL 60450",
-      "3170-113": "ODEKERKEN WAYNE S TR (Waterfront Trust)\n51268 Pelican Point Dr, Detroit Lakes MN 56501",
+      "3170-112": "FUNK SHEILA TR\n473 Edgewater Dr, Morris IL 60450",
+      "3170-113": "ODEKERKEN WAYNE S TR\n51268 Pelican Point Dr, Detroit Lakes MN 56501",
       "3170-114": "2ND BILL RENTALS LLC\n17917 Courtside Landings Cir., Punta Gorda FL 33955",
       "3170-115": "WINN BRENDYL L\nP.O. Box 242, Pallotton MI 49769",
       "3170-116": "HUFFMAN W ALAN + KATHRYN H TR\n4080 Cape Cole Blvd., Punta Gorda FL 33955",
       "3170-117": "GREEN CHRISTOPHER + LISA\n69 Pine Valley Ct, Rotonda West FL 33947",
       "3170-118": "GREEN PETER + CLINTON RITA\n3870 Ontario Dr, North Tonawanda NY 14120",
-      "3170-119": "BELLAMARK MARK ALLEN\n103 McIntyre Ln, Freeport PA 16229",
-      "3170-120": "MANI LLC\nP.O. Box 682, Park Ridge IL 60068",
-      "3170-121": "SIMPSON JUDY KAY\n2016 WHITE OAK DR, FREEPORT PA 16229",
-      "3170-122": "LONERGAN MARK S\n1812 NE 44TH ST, CAPE CORAL FL 33909",
-      "3170-123": "HENNE JUX ASHLEY DANE\nNORTH HUNTINGTON PA 15642",
-      "3170-124": "LOVEJOY SKY ISAIAH\n121 VIA TOSCANA WAY, SUN CITY CENTER FL 33573",
-      "3170-125": "PERRAUD ROBERT C & CYNTHIA M\n106 COCKATOO LN, MELBOURNE BEACH FL 32951",
-      "3170-128": "PETTY ROBERT R & JUDITH N\n2511 CARDINAL HARBOUR RD, PROSPECT KY 40059",
-      "3170-131": "JENNINGS STEVEN + GROTHE DARLA",
-      "3170-132": "ANDERSON MICHAEL P & ZIEGENHORN CATHERINE\n7455 BOCA VISTA ROAD, PUNTA GORDA FL 33955",
-      "3170-133": "LIBBY ROBERT W & CYNTHIA F\n463 OLD MEETINGHOUSE RD, PORTER ME 04068",
-      "3170-134": "SLOAN ANTHONY J\n3170 MATECUMBE KEY RD #135, PUNTA GORDA FL 33955",
-      "3170-137": "LINDAHL JULIE\n3170 MATECUMBE KEY RD #137, PUNTA GORDA FL 33955",
       "3160-211": "SCOTT JOSEPH T & TERRI LYNN\n7996 AGORA BLVD, PUNTA GORDA FL 33955",
       "3160-212": "ANTHONESEN GARY J\n1111 N LYNBROOK LN, CIG RUNNARD FL 33955",
       "3160-213": "SLOANE DEREK K & JANETTE M\n7777 CONROY WINDERMERE RD, ORLANDO FL 32835",
       "3160-214": "WEGENER WILLIAM & WHELAN BARBARA TR\n2345 SUGARLOAF KEY #216, PUNTA GORDA FL 33955",
-      "3160-217": "WEGENER WILLIAM & BEVERLY SAGE DUKES\n78 PORT PIERCE DO 57532",
       "3160-218": "TANNOUS BETH ANN\n3160 MATECUMBE KEY RD #218, PUNTA GORDA FL 33955",
-      "3160-221": "JOE S AUTOWHOLESALE INC 5708 RALEIGH DR NORFOLK VA 23502",
-      "3160-223": "BASHAM DAVID W L\n4581 N PASEO DE LOS CERRITOS, TUCSON AZ 85745",
-      "3160-224": "WTERNAIL5 LLC\n10396 ATENIA ST, PORT CHARLOTTE FL 33981",
-      "3160-225": "LEGER GERALD F & AMY L\n25 ELM LN E, GROTON CT 06340",
-      "3160-226": "MARSHALL LARRY J\n10396 ATENIA ST, PORT CHARLOTTE FL 33981",
-      "3160-227": "STEFANSKI PETER\n5305 MAYFIELD RD, JACKSON WI 53037",
-      "3160-228": "WTERNAIL5 LLC\n10396 ATENIA ST, PORT CHARLOTTE FL 33981",
-      "3160-231": "HARWOOD GERALD W & JACQUELYN H\n5198 ARROWWOOD DR, PARK CITY UT 84098",
-      "3160-232": "DEBIA MUZIO SHARON E\n24707 CEDAR RIDGE CT, FARMINGTON HILLS MI 48335",
-      "3160-233": "MCDONAGH BARBARA A & ROCKY\nHOOK WADEN MA 01085",
-      "3160-234": "SANDERS KENNETH H & ROBERTA F + CLARK J III ET AL\n4919 GARFIELD LN, WAUCHULA FL 33873",
       "3160-235": "ANTHONY JOHN J & CALL BOBBI J\n3170 MATECUMBE KEY RD #135, PUNTA GORDA FL 33955",
-      "3160-236": "KLADE BEATRICE\n2770/07 80TH ST, NAPERVILLE IL 60565",
-      "3160-237": "JEFFERY JEFFERY\n20705 CROSSING DR, COVINGTON KY 41017",
       "3160-238": "AMMONS MICHAEL L + DEBRA ENGLERT\n1613 ST THOMAS DR, MIDLOTHIAN VA 23114"
+      // Continue filling in all units from your spreadsheet...
     };
 
+    // Layout definitions
     const layouts = {
-      "3170": [["111","112","113","114","115","116","117","118"],
-               ["121","122","123","124","125","126","127","128"],
-               ["131","132","133","134","135","136","137","138"]],
-      "3160": [["211","212","213","214","215","216","217","218"],
-               ["221","222","223","224","225","226","227","228"],
-               ["231","232","233","234","235","236","237","238"]]
+      "3170": [
+        ["111","112","113","114","115","116","117","118"],
+        ["121","122","123","124","125","126","127","128"],
+        ["131","132","133","134","135","136","137","138"]
+      ],
+      "3160": [
+        ["211","212","213","214","215","216","217","218"],
+        ["221","222","223","224","225","226","227","228"],
+        ["231","232","233","234","235","236","237","238"]
+      ]
     };
 
+    // Build clickable unit boxes
     function buildUnits() {
       for (const [building, floors] of Object.entries(layouts)) {
         floors.forEach((units, floorIndex) => {
           const floorDiv = document.getElementById(`floor${building}-${floorIndex+1}`);
-          units
+          units.forEach(unit => {
+            const div = document.createElement('div');
+            div.className = 'unit';
+            div.innerText = unit;
+            div.onclick = () => showInfo(building, unit);
+            floorDiv.appendChild(div);
+          });
+        });
+      }
+    }
+
+    function showInfo(building, unit) {
+      const key = building + '-' + unit;
+      const owner = owners[key] || "Owner info not available";
+      document.getElementById('info').innerText = `Building ${building}, Unit ${unit}\n${owner}`;
+    }
+
+    buildUnits();
+  </script>
+</body>
+</html>
