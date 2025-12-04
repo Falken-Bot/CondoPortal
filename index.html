@@ -286,10 +286,9 @@
         import { getFirestore, doc, setDoc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        // Capture the raw global for diagnostic logging
-        const rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null; 
+        // The conditional check below ensures the code doesn't crash if the variable doesn't exist.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : (window['__app_id'] || 'default-app-id');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : (window['__initial_auth_token'] || null);
         
         let db, auth;
         let isAuthenticated = false; // Flag for successful sign-in
@@ -357,6 +356,10 @@
 
 
         let unitInfoData = {}; 
+        let currentAuthAttempt = 0;
+        const MAX_AUTH_RETRIES = 15;
+        const AUTH_DELAY_MS = 200;
+
 
         // --- Firebase Setup and Real-Time Listener ---
 
@@ -373,71 +376,60 @@
         /**
          * Parses the Firebase configuration from the global environment variable.
          * Tries to wait for the configuration to be injected with multiple retries.
-         * @param {number} retries - The number of times to try to fetch the config.
-         * @param {number} delay - The delay in milliseconds between retries.
          * @returns {Promise<Object>} The parsed firebase config object.
          */
-        async function getFirebaseConfigWithRetry(retries = 15, delay = 200) {
-            let firebaseConfig = {};
+        async function getFirebaseConfigWithRetry() {
             const statusMessageElement = document.getElementById('status-message');
             
-            // Re-read global variable inside the function scope to ensure we get the latest injection
-            const rawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            for (let i = 0; i < MAX_AUTH_RETRIES; i++) {
+                currentAuthAttempt = i + 1;
 
-            // Log initial state for diagnosis
-            if (rawConfig === null) {
-                console.warn(`[DIAGNOSTIC] __firebase_config is strictly 'null' or undefined globally.`);
-            } else {
-                console.log(`[DIAGNOSTIC] __firebase_config type: ${typeof rawConfig}. Length: ${typeof rawConfig === 'string' ? rawConfig.length : 'N/A'}`);
-            }
+                // 1. Try to read the variable from both standard global and window object
+                let currentRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+                if (!currentRawConfig) {
+                    currentRawConfig = window['__firebase_config'] || null;
+                }
 
-            // Wait for up to 3 seconds total (15 retries * 200ms)
-            for (let i = 0; i < retries; i++) {
-                
                 let configAttempt = null;
-                const currentRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
 
-                // 1. Check if the config variable exists
-                if (currentRawConfig) {
-                    
-                    if (typeof currentRawConfig === 'string' && currentRawConfig.trim() !== '') {
-                        // Standard behavior: parse the string
-                        try {
-                            configAttempt = JSON.parse(currentRawConfig);
-                        } catch (e) {
-                            console.error(`[CRITICAL ERROR] Attempt ${i + 1}: Failed to parse __firebase_config JSON:`, e);
-                            break; 
-                        }
-                    } else if (typeof currentRawConfig === 'object' && currentRawConfig !== null) {
-                        // Defensive check for non-standard injection as an object
-                        configAttempt = currentRawConfig;
+                // 2. Check if the config variable exists and is a non-empty string
+                if (currentRawConfig && typeof currentRawConfig === 'string' && currentRawConfig.trim() !== '') {
+                    try {
+                        configAttempt = JSON.parse(currentRawConfig);
+                    } catch (e) {
+                        console.error(`[CRITICAL ERROR] Attempt ${currentAuthAttempt}: Failed to parse __firebase_config JSON:`, e);
+                        // Stop retrying if parsing fails, as the content is fundamentally wrong
+                        break; 
                     }
-                    
-                    // 2. Check if the config is valid
-                    if (configAttempt && configAttempt.apiKey) {
-                        console.log(`[SUCCESS] Attempt ${i + 1}: Firebase config found and valid.`);
-                        return configAttempt;
-                    } else if (configAttempt) {
-                        console.warn(`[WARNING] Attempt ${i + 1}: __firebase_config found, but is missing 'apiKey' field.`);
-                    }
+                } else if (currentRawConfig && typeof currentRawConfig === 'object' && currentRawConfig !== null) {
+                     // Defensive check for non-standard injection as an object
+                     configAttempt = currentRawConfig;
                 }
                 
+                // 3. Check if the config is valid (has apiKey)
+                if (configAttempt && configAttempt.apiKey) {
+                    console.log(`[SUCCESS] Attempt ${currentAuthAttempt}: Firebase config found and valid.`);
+                    return configAttempt;
+                } 
+                
                 // If we haven't succeeded, log and wait
-                if (i < retries - 1) { // Only log retry message if more retries are coming
-                    console.log(`[RETRY] Attempt ${i + 1}: __firebase_config is missing or invalid. Waiting...`);
+                if (i < MAX_AUTH_RETRIES - 1) { 
+                    console.log(`[RETRY] Attempt ${currentAuthAttempt}: __firebase_config is missing or invalid. Waiting...`);
                     // Update status message on UI
-                    statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${i + 1}/${retries}). Please wait up to 3 seconds.`;
-                    await sleep(delay);
+                    statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${currentAuthAttempt}/${MAX_AUTH_RETRIES}). Please wait up to ${MAX_AUTH_RETRIES * AUTH_DELAY_MS / 1000} seconds.`;
+                    await sleep(AUTH_DELAY_MS);
                 }
             }
             
             // --- Final Failure Diagnostic ---
-            const finalRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            let finalRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            if (!finalRawConfig) finalRawConfig = window['__firebase_config'] || null;
+
             const configType = typeof finalRawConfig;
             let configStatus;
 
             if (finalRawConfig === null) {
-                 configStatus = 'MISSING (Undefined or Null)';
+                 configStatus = 'MISSING (Undefined/Null on Global/Window)';
             } else if (configType === 'string' && finalRawConfig.trim().length === 0) {
                  configStatus = 'Found (Empty String)';
             } else if (configType === 'string') {
