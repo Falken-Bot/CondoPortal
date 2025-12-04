@@ -281,16 +281,27 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        
+        let firebaseConfig = {};
+        // Attempt to parse config robustly
+        if (typeof __firebase_config === 'string' && __firebase_config.trim() !== '') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("CRITICAL ERROR: Failed to parse __firebase_config JSON:", e);
+                // firebaseConfig remains {} on error
+            }
+        }
+        
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         let db, auth;
-        let isAuthReady = false; // Auth status check is complete
+        let isAuthenticated = false; // Flag for successful sign-in
         let isRealtimeEnabled = false; // Flag for active database connection and saving ability
         let userId = null;
         let allUnitStatuses = {}; // Global state for market statuses from Firestore
@@ -299,7 +310,7 @@
         // Set log level to see Firebase internal logs (helpful for debugging)
         setLogLevel('Debug');
 
-        // Raw data (omitted for brevity, assume content is loaded into RAW_DATA variable)
+        // --- STATIC RAW DATA (RETAINED) ---
         const RAW_DATA = `3170 MATECUMBE KEY RD 111, Punta Gorda FL 33955 WYNNIK DARREN T + WYNNIK HEATHER Z — 3553 Potato Garden Run Rd, Imperial PA 15126
 3170 MATECUMBE KEY RD 112, Punta Gorda FL 33955 FUNK SHEILA TR (For Sheila Funk Trust) — 473 Edgewater Dr, Morris IL 60450
 3170 MATECUMBE KEY RD 113, Punta Gorda FL 33955 ENGKJER WANE S TR (For Waterfront Trust) — 51628 Pelican Point Dr, Detroit Lakes MN 56501
@@ -354,78 +365,6 @@
         // --- Firebase Setup and Real-Time Listener ---
 
         /**
-         * Initializes Firebase and returns a Promise that resolves when authentication is complete.
-         */
-        function initializeFirebase() {
-            return new Promise((resolve, reject) => {
-                const statusMessageElement = document.getElementById('status-message');
-
-                // Check 1: Configuration must be present and valid
-                if (!firebaseConfig || !firebaseConfig.apiKey) {
-                    statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800';
-                    statusMessageElement.textContent = 'Firebase configuration missing. Real-time features disabled (Read-Only Mode).';
-                    isAuthReady = true;
-                    isRealtimeEnabled = false;
-                    resolve();
-                    return;
-                }
-
-                try {
-                    const app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
-
-                    // 1. Sign in (anonymously or with custom token)
-                    const signInPromise = initialAuthToken 
-                        ? signInWithCustomToken(auth, initialAuthToken) 
-                        : signInAnonymously(auth);
-
-                    signInPromise.catch((error) => {
-                        console.error("Sign-in failed:", error);
-                        statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                        statusMessageElement.textContent = 'Authentication failed. Status updates will not be saved (Read-Only Mode).';
-                        isAuthReady = true;
-                        isRealtimeEnabled = false;
-                        resolve();
-                    });
-
-                    // 2. Wait for the Auth State to change
-                    const unsubscribe = onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            userId = user.uid;
-                            isAuthReady = true;
-                            isRealtimeEnabled = true; // Success!
-                            
-                            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
-                            statusMessageElement.textContent = `Connected (User: ${userId}). Status updates are real-time.`;
-                            
-                            unsubscribe(); 
-                            
-                            startRealTimeStatusListener();
-                            resolve();
-                        } else {
-                            // Only fires if sign-in fails or is not yet complete
-                            if (!isAuthReady) {
-                                isAuthReady = true;
-                                isRealtimeEnabled = false;
-                                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                                statusMessageElement.textContent = 'Authentication failed. Status updates will not be saved (Read-Only Mode).';
-                                resolve();
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.error("Firebase initialization failed:", error);
-                    document.getElementById('status-message').className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                    document.getElementById('status-message').textContent = 'Critical error connecting to database (Read-Only Mode).';
-                    isAuthReady = true;
-                    isRealtimeEnabled = false;
-                    reject(error);
-                }
-            });
-        }
-        
-        /**
          * Gets the Firestore collection reference for public unit statuses.
          */
         function getUnitStatusCollectionRef() {
@@ -435,6 +374,63 @@
             return collection(db, collectionPath);
         }
 
+        /**
+         * Initializes Firebase and returns a Promise that resolves when authentication is complete.
+         */
+        async function initializeFirebase() {
+            const statusMessageElement = document.getElementById('status-message');
+            statusMessageElement.textContent = 'Connecting to database...';
+            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800';
+
+            // CRITICAL CHECK: Ensure the parsed config is valid
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                const msg = 'CONFIGURATION MISSING: Real-time features disabled. Please ensure the hosting environment provides a valid Firebase config.';
+                console.error(msg);
+                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+                statusMessageElement.textContent = msg;
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Use direct await for sign-in
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Signed in with custom token successfully.");
+                } else {
+                    await signInAnonymously(auth);
+                    console.log("Signed in anonymously.");
+                }
+                
+                const user = auth.currentUser;
+
+                if (user) {
+                    userId = user.uid;
+                    isAuthenticated = true;
+                    isRealtimeEnabled = true; // Success!
+                    
+                    statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
+                    statusMessageElement.textContent = `Connected (User ID: ${userId.substring(0, 8)}...). Status updates are real-time.`;
+                    
+                    startRealTimeStatusListener();
+                } else {
+                    // This block catches the authentication failure reported by the user
+                    throw new Error("User object is null after sign-in attempt (Authentication Failed).");
+                }
+
+            } catch (error) {
+                console.error("Firebase Initialization or Sign-in failed:", error);
+                isAuthenticated = false;
+                isRealtimeEnabled = false;
+                const msg = 'SAVING DISABLED Reason: AUTHENTICATION FAILED: Status updates will not be saved (Read-Only Mode).';
+                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+                statusMessageElement.textContent = msg;
+            }
+        }
+        
         /**
          * Starts the real-time listener for unit statuses.
          */
@@ -477,14 +473,38 @@
          * @param {{forSale: boolean, rental: boolean}} status 
          */
         async function saveMarketStatus(unitId, status) {
+            const statusMessageElement = document.getElementById('status-message');
+            
             if (!isRealtimeEnabled || !db || !userId) {
                 console.warn("Real-time saving is disabled. Cannot save status.");
-                // Provide visual feedback if saving is attempted when disabled
+                
                 const marketSection = document.getElementById('market-status-section');
-                marketSection.innerHTML = `<h3 class="font-semibold text-indigo-600">Market Status:</h3><p class="text-red-600 text-sm mt-1 font-bold">SAVING DISABLED: Checkbox state not saved. Reload the page if connection restores.</p>`;
-                setTimeout(() => updateInfoPanel(unitId), 3000); // Revert UI after 3s
+                
+                // Use the existing status message for the reason
+                const currentStatusMessage = statusMessageElement.textContent;
+
+                // Temporarily display the failure message in the info panel
+                marketSection.innerHTML = `
+                    <h3 class="font-semibold text-indigo-600">Market Status:</h3>
+                    <div class="p-3 bg-red-50 border border-red-300 rounded-lg">
+                        <p class="text-red-700 font-bold text-sm">
+                            <span style="font-size: 1.2em;">&#9888;</span> SAVING DISABLED
+                        </p>
+                        <p class="text-gray-600 text-xs mt-1">
+                            Reason: ${currentStatusMessage}
+                        </p>
+                    </div>
+                `;
+                // Revert UI after 4s (but only if the unit is still active)
+                setTimeout(() => { if(unitId === activeUnitId) updateInfoPanel(unitId); }, 4000); 
                 return;
             }
+            
+            // Temporary visual feedback while waiting for network response
+            statusMessageElement.textContent = 'Saving unit status...';
+            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-blue-100 text-blue-800';
+
+
             try {
                 // Ensure data is valid before saving
                 const dataToSave = { 
@@ -496,8 +516,14 @@
                 // setDoc merges existing data if the document already exists
                 await setDoc(docRef, dataToSave, { merge: true }); 
                 
+                // Success feedback - the listener will update the grid, but we update the main status bar
+                statusMessageElement.textContent = `Connected (User ID: ${userId.substring(0, 8)}...). Status updates are real-time.`;
+                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
+
             } catch (error) {
                 console.error("FATAL ERROR: Failed to save market status to Firestore. Check security rules or connection:", error);
+                statusMessageElement.textContent = `ERROR: Failed to save status for unit ${unitId}. See console for details.`;
+                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
             }
         }
         
@@ -523,21 +549,30 @@
                     let ownerName = '';
                     let mailingAddress = ownerAddressRaw;
 
+                    // Common delimiters used in the raw data to separate Name and Address
                     const delimiters = ['—', ' L/E ', ' TR ', ' LLC ', ' INC ', ' ET AL '];
                     let delimiterIndex = -1;
+                    let delimiterLength = 0;
 
+                    // Find the first delimiter to separate owner name from mailing address
                     for (const delim of delimiters) {
-                        const index = ownerAddressRaw.toUpperCase().indexOf(delim);
-                        if (index > -1 && (delimiterIndex === -1 || index < delimiterIndex)) {
-                            delimiterIndex = index;
+                        // Use case-insensitive search logic for the delimiter in the raw string
+                        const rawDelimiter = line.substring(ownerDataStart).toUpperCase().indexOf(delim.trim().toUpperCase());
+                        
+                        // We must ensure this delimiter is not part of the address section itself, 
+                        // but since the original logic was simple, we stick to finding the first occurrence
+                        if (rawDelimiter > -1 && (delimiterIndex === -1 || rawDelimiter < delimiterIndex)) {
+                            delimiterIndex = rawDelimiter;
+                            delimiterLength = delim.length;
                         }
                     }
 
                     if (delimiterIndex > -1) {
                         ownerName = ownerAddressRaw.substring(0, delimiterIndex).trim();
-                        const delimiterUsed = delimiters.find(delim => ownerAddressRaw.toUpperCase().substring(delimiterIndex).startsWith(delim));
-                        mailingAddress = ownerAddressRaw.substring(delimiterIndex + (delimiterUsed ? delimiterUsed.length : 0)).trim().replace('—', '').trim();
+                        // Adjust address start by delimiter length
+                        mailingAddress = ownerAddressRaw.substring(delimiterIndex + delimiterLength).trim().replace('—', '').trim();
                     } else {
+                        // Fallback: look for first number as start of address (often the street number)
                         const firstDigitIndex = ownerAddressRaw.search(/\d/);
                         if (firstDigitIndex > 10) { 
                             ownerName = ownerAddressRaw.substring(0, firstDigitIndex).trim();
@@ -551,6 +586,9 @@
                     ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
                     mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
 
+                    // Clean up common suffix leftovers
+                    mailingAddress = mailingAddress.replace(/,\s*PUNTA GORDA FL\s*(\d{5})/, '').trim(); 
+                    
                     dataMap[unitId] = {
                         building: propertyAddressMatch[1],
                         owner: ownerName,
@@ -578,6 +616,7 @@
                     classes += ' inactive bg-gray-100';
                     unitElement.textContent = ''; 
                 } else if (!isDataAvailable) {
+                    // This is for unit numbers without parsed data (shouldn't happen with current data)
                     classes += ' inactive';
                     unitElement.textContent = unit;
                 } else {
@@ -602,6 +641,11 @@
 
             // Remove existing market classes
             unitElement.classList.remove('for-sale', 'rental');
+            
+            // Remove active state unless it's the currently selected unit
+            if (unitId !== activeUnitId) {
+                 unitElement.classList.remove('active');
+            }
 
             // Apply new classes
             if (status && status.forSale) {
@@ -641,14 +685,15 @@
             } else {
                 // Render disabled message (Read-Only Mode)
                 marketSection.style.flexDirection = 'column';
+                const currentStatusMessage = document.getElementById('status-message').textContent;
                 marketSection.innerHTML = `
                     <h3 class="font-semibold text-indigo-600">Market Status:</h3>
                     <div class="p-3 bg-red-50 border border-red-300 rounded-lg">
                         <p class="text-red-700 font-bold text-sm">
-                            <span style="font-size: 1.2em;">&#9888;</span> Saving Disabled
+                            <span style="font-size: 1.2em;">&#9888;</span> SAVING DISABLED
                         </p>
                         <p class="text-gray-600 text-xs mt-1">
-                            Unit status cannot be updated due to database connection issues (Read-Only Mode).
+                            Reason: ${currentStatusMessage}
                         </p>
                     </div>
                 `;
