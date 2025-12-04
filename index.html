@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matecumbe Key Property Portal - Real-Time Status</title>
+    <title>Matecumbe Key Property Portal - LocalStorage Persistence</title>
     
     <style>
         /* Base Colors & Typography (Using standard Tailwind-like classes) */
@@ -136,7 +136,7 @@
             cursor: pointer;
             transition: all 0.2s;
             user-select: none; 
-            opacity: 0.8; /* Slightly less opaque until data confirms it's not inactive */
+            opacity: 0.8; 
         }
 
         .unit:hover:not(.inactive) {
@@ -188,7 +188,7 @@
         
         /* Styling for the checkbox section */
         .market-status-controls {
-            display: none; /* Hide until logic determines if enabled or disabled message should show */
+            display: none; 
             flex-direction: column;
             gap: 0.75rem;
             margin-top: 1rem;
@@ -223,9 +223,9 @@
             <p class="text-lg text-gray-600 mt-2">Click a unit to view owner information and set market status.</p>
         </header>
 
-        <!-- Status Message & User ID -->
-        <div id="status-message" class="text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800">
-            Initializing application and connecting to database...
+        <!-- Status Message -->
+        <div id="status-message" class="text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800">
+            Persistence enabled: Status is saved to your browser's Local Storage.
         </div>
 
         <!-- Main Content Area -->
@@ -271,7 +271,7 @@
                         
                         <!-- Market Status Controls -->
                         <div id="market-status-section" class="market-status-controls">
-                            <!-- Content will be injected by JavaScript based on isRealtimeEnabled -->
+                            <!-- Checkboxes will be injected here -->
                         </div>
                         
                     </div>
@@ -280,32 +280,10 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables provided by the environment
-        // The conditional check below ensures the code doesn't crash if the variable doesn't exist.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : (window['__app_id'] || 'default-app-id');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : (window['__initial_auth_token'] || null);
+    <script>
+        // --- CONSTANTS ---
+        const LOCAL_STORAGE_KEY = 'matecumbeUnitStatuses';
         
-        let db, auth;
-        let isAuthenticated = false; // Flag for successful sign-in
-        let isRealtimeEnabled = false; // Flag for active database connection and saving ability
-        let userId = null;
-        let allUnitStatuses = {}; // Global state for market statuses from Firestore
-        let activeUnitId = null; // Store the ID of the currently selected unit
-
-        // Set log level to see Firebase internal logs (helpful for debugging)
-        setLogLevel('Debug');
-        
-        // Helper function for a small delay
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        // --- STATIC RAW DATA (RETAINED) ---
         const RAW_DATA = `3170 MATECUMBE KEY RD 111, Punta Gorda FL 33955 WYNNIK DARREN T + WYNNIK HEATHER Z — 3553 Potato Garden Run Rd, Imperial PA 15126
 3170 MATECUMBE KEY RD 112, Punta Gorda FL 33955 FUNK SHEILA TR (For Sheila Funk Trust) — 473 Edgewater Dr, Morris IL 60450
 3170 MATECUMBE KEY RD 113, Punta Gorda FL 33955 ENGKJER WANE S TR (For Waterfront Trust) — 51628 Pelican Point Dr, Detroit Lakes MN 56501
@@ -356,246 +334,64 @@
 
 
         let unitInfoData = {}; 
-        let currentAuthAttempt = 0;
-        const MAX_AUTH_RETRIES = 15;
-        const AUTH_DELAY_MS = 200;
+        let allUnitStatuses = {}; // Global state for market statuses from LocalStorage
+        let activeUnitId = null; // Store the ID of the currently selected unit
 
-
-        // --- Firebase Setup and Real-Time Listener ---
+        // --- LocalStorage Persistence Logic ---
 
         /**
-         * Gets the Firestore collection reference for public unit statuses.
+         * Loads all unit statuses from Local Storage.
+         * @returns {Object} Parsed status object or an empty object.
          */
-        function getUnitStatusCollectionRef() {
-            if (!db) return null;
-            // Public data path: /artifacts/{appId}/public/data/{collectionName}
-            const collectionPath = `artifacts/${appId}/public/data/unitStatuses`;
-            return collection(db, collectionPath);
-        }
-
-        /**
-         * Parses the Firebase configuration from the global environment variable.
-         * Tries to wait for the configuration to be injected with multiple retries.
-         * @returns {Promise<Object>} The parsed firebase config object.
-         */
-        async function getFirebaseConfigWithRetry() {
-            const statusMessageElement = document.getElementById('status-message');
-            
-            for (let i = 0; i < MAX_AUTH_RETRIES; i++) {
-                currentAuthAttempt = i + 1;
-
-                // 1. Try to read the variable from both standard global and window object
-                let currentRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                if (!currentRawConfig) {
-                    currentRawConfig = window['__firebase_config'] || null;
-                }
-
-                let configAttempt = null;
-
-                // 2. Check if the config variable exists and is a non-empty string
-                if (currentRawConfig && typeof currentRawConfig === 'string' && currentRawConfig.trim() !== '') {
-                    try {
-                        configAttempt = JSON.parse(currentRawConfig);
-                    } catch (e) {
-                        console.error(`[CRITICAL ERROR] Attempt ${currentAuthAttempt}: Failed to parse __firebase_config JSON:`, e);
-                        // Stop retrying if parsing fails, as the content is fundamentally wrong
-                        break; 
-                    }
-                } else if (currentRawConfig && typeof currentRawConfig === 'object' && currentRawConfig !== null) {
-                     // Defensive check for non-standard injection as an object
-                     configAttempt = currentRawConfig;
-                }
-                
-                // 3. Check if the config is valid (has apiKey)
-                if (configAttempt && configAttempt.apiKey) {
-                    console.log(`[SUCCESS] Attempt ${currentAuthAttempt}: Firebase config found and valid.`);
-                    return configAttempt;
-                } 
-                
-                // If we haven't succeeded, log and wait
-                if (i < MAX_AUTH_RETRIES - 1) { 
-                    console.log(`[RETRY] Attempt ${currentAuthAttempt}: __firebase_config is missing or invalid. Waiting...`);
-                    // Update status message on UI
-                    statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${currentAuthAttempt}/${MAX_AUTH_RETRIES}). Please wait up to ${MAX_AUTH_RETRIES * AUTH_DELAY_MS / 1000} seconds.`;
-                    await sleep(AUTH_DELAY_MS);
-                }
-            }
-            
-            // --- Final Failure Diagnostic ---
-            let finalRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-            if (!finalRawConfig) finalRawConfig = window['__firebase_config'] || null;
-
-            const configType = typeof finalRawConfig;
-            let configStatus;
-
-            if (finalRawConfig === null) {
-                 configStatus = 'MISSING (Undefined/Null on Global/Window)';
-            } else if (configType === 'string' && finalRawConfig.trim().length === 0) {
-                 configStatus = 'Found (Empty String)';
-            } else if (configType === 'string') {
-                 configStatus = 'Found (String, failed to parse or missing API key)';
-            } else if (configType === 'object') {
-                 configStatus = 'Found (Object, missing API key)';
-            } else {
-                 configStatus = 'Found (Unexpected Type)';
-            }
-            
-            console.error(`[CRITICAL CONFIGURATION ERROR] Final Status: ${configStatus}. Typeof: ${configType}.`);
-            
-            // Update status message with detailed diagnostic
-            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-            statusMessageElement.innerHTML = `
-                <p class="font-bold">CONFIGURATION MISSING: Real-time features disabled.</p>
-                <p class="text-xs mt-1">Expected variable: <code class="font-mono">__firebase_config</code> (Valid Firebase JSON).</p>
-                <p class="text-xs">Received Status: ${configStatus}. Typeof: ${configType}.</p>
-                <p class="text-xs font-bold mt-2">The application is running in Read-Only Mode.</p>
-            `;
-
-            return {}; // Return empty object if all retries fail
-        }
-
-
-        /**
-         * Initializes Firebase and returns a Promise that resolves when authentication is complete.
-         */
-        async function initializeFirebase() {
-            const statusMessageElement = document.getElementById('status-message');
-            statusMessageElement.textContent = 'Connecting to database...';
-            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800';
-
-            // 1. Get configuration, waiting with retry logic
-            const firebaseConfig = await getFirebaseConfigWithRetry();
-
-            // 2. CRITICAL CHECK: Ensure the parsed config is valid
-            if (!firebaseConfig || !firebaseConfig.apiKey) {
-                isRealtimeEnabled = false; 
-                // The detailed error message is already set by getFirebaseConfigWithRetry
-                updateMarketStatusSectionForDisabledState();
-                return;
-            }
-
+        function loadStatusesFromLocalStorage() {
             try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // 3. Authenticate
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Signed in with custom token successfully.");
-                } else {
-                    await signInAnonymously(auth);
-                    console.log("Signed in anonymously.");
-                }
-                
-                const user = auth.currentUser;
-
-                if (user) {
-                    userId = user.uid;
-                    isAuthenticated = true;
-                    isRealtimeEnabled = true; // Success!
-                    
-                    statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
-                    statusMessageElement.textContent = `Connected (User ID: ${userId.substring(0, 8)}...). Status updates are real-time.`;
-                    
-                    startRealTimeStatusListener();
-                } else {
-                    // This block catches the authentication failure
-                    throw new Error("User object is null after sign-in attempt (Authentication Failed).");
-                }
-
-            } catch (error) {
-                console.error("Firebase Initialization or Sign-in failed:", error);
-                isAuthenticated = false;
-                isRealtimeEnabled = false;
-                const msg = 'SAVING DISABLED Reason: AUTHENTICATION FAILED: Status updates will not be saved (Read-Only Mode).';
-                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                statusMessageElement.textContent = msg;
-                updateMarketStatusSectionForDisabledState();
+                const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return storedData ? JSON.parse(storedData) : {};
+            } catch (e) {
+                console.error("Error loading from Local Storage:", e);
+                return {};
             }
         }
-        
+
         /**
-         * Starts the real-time listener for unit statuses.
+         * Saves all unit statuses to Local Storage.
+         * @param {Object} statuses The complete status map to save.
          */
-        function startRealTimeStatusListener() {
-            const unitStatusColRef = getUnitStatusCollectionRef();
-            if (!unitStatusColRef) return;
-            
-            // Listen for changes across the entire 'unitStatuses' collection
-            onSnapshot(unitStatusColRef, (snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added" || change.type === "modified") {
-                        const unitId = change.doc.id;
-                        const status = change.doc.data();
-                        
-                        // 1. Update the global state
-                        allUnitStatuses[unitId] = status;
-                        
-                        // 2. Update the unit square color on the map
-                        updateUnitColor(unitId, status);
-                        
-                        // 3. If the changed unit is the currently selected one, update the checkbox UI
-                        if (unitId === activeUnitId) {
-                            updateInfoPanel(unitId); // Re-run to update checkboxes and info
-                        }
-                    } else if (change.type === "removed") {
-                        // Clear status if removed
-                        const unitId = change.doc.id;
-                        allUnitStatuses[unitId] = { forSale: false, rental: false };
-                        updateUnitColor(unitId, { forSale: false, rental: false });
-                    }
-                });
-            }, (error) => {
-                console.error("Firestore listening failed:", error);
-            });
+        function saveStatusesToLocalStorage(statuses) {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(statuses));
+                // Optional: provide brief UI feedback if needed
+                console.log("Status saved to Local Storage.");
+            } catch (e) {
+                console.error("Error saving to Local Storage:", e);
+                const statusMessageElement = document.getElementById('status-message');
+                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+                statusMessageElement.textContent = 'ERROR: Cannot save to Local Storage (Storage quota exceeded or browser restriction).';
+            }
         }
 
         /**
-         * Saves market status for a unit to Firestore.
+         * Updates a single unit's status in the global state and persists the change.
+         * Then triggers a map update.
          * @param {string} unitId 
-         * @param {{forSale: boolean, rental: boolean}} status 
+         * @param {{forSale: boolean, rental: boolean}} newStatus 
          */
-        async function saveMarketStatus(unitId, status) {
-            const statusMessageElement = document.getElementById('status-message');
+        function updateAndPersistStatus(unitId, newStatus) {
+            // 1. Update global state
+            allUnitStatuses[unitId] = { 
+                forSale: !!newStatus.forSale, 
+                rental: !!newStatus.rental 
+            };
             
-            if (!isRealtimeEnabled || !db || !userId) {
-                console.warn("Real-time saving is disabled. Cannot save status.");
-                
-                const marketSection = document.getElementById('market-status-section');
-                
-                // Temporarily display the failure message in the info panel
-                updateMarketStatusSectionForDisabledState(marketSection);
-                
-                // Revert UI after 4s (but only if the unit is still active)
-                setTimeout(() => { if(unitId === activeUnitId) updateInfoPanel(unitId); }, 4000); 
-                return;
-            }
+            // 2. Persist state
+            saveStatusesToLocalStorage(allUnitStatuses);
             
-            // Temporary visual feedback while waiting for network response
-            statusMessageElement.textContent = 'Saving unit status...';
-            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-blue-100 text-blue-800';
-
-
-            try {
-                // Ensure data is valid before saving
-                const dataToSave = { 
-                    forSale: !!status.forSale, 
-                    rental: !!status.rental 
-                };
-                
-                const docRef = doc(getUnitStatusCollectionRef(), unitId);
-                // setDoc merges existing data if the document already exists
-                await setDoc(docRef, dataToSave, { merge: true }); 
-                
-                // Success feedback - the listener will update the grid, but we update the main status bar
-                statusMessageElement.textContent = `Connected (User ID: ${userId.substring(0, 8)}...). Status updates are real-time.`;
-                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
-
-            } catch (error) {
-                console.error("FATAL ERROR: Failed to save market status to Firestore. Check security rules or connection:", error);
-                statusMessageElement.textContent = `ERROR: Failed to save status for unit ${unitId}. See console for details.`;
-                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+            // 3. Update the map (color)
+            updateUnitColor(unitId, allUnitStatuses[unitId]);
+            
+            // 4. Re-render the info panel to update the checkbox state immediately
+            if (unitId === activeUnitId) {
+                updateInfoPanel(unitId);
             }
         }
         
@@ -609,7 +405,8 @@
             const dataMap = {};
             
             lines.forEach(line => {
-                const propertyAddressMatch = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3}),?\s*Punta GORDA FL\s*(\d{5})/i);
+                // Regex to find the building, unit number, city, state, zip (e.g., 3170 MATECUMBE KEY RD 111, Punta Gorda FL 33955)
+                const propertyAddressMatch = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3}),?\s*Punta Gorda FL\s*(\d{5})/i);
 
                 if (propertyAddressMatch) {
                     const fullPropertyAddress = propertyAddressMatch[0]; 
@@ -628,11 +425,8 @@
 
                     // Find the first delimiter to separate owner name from mailing address
                     for (const delim of delimiters) {
-                        // Use case-insensitive search logic for the delimiter in the raw string
                         const rawDelimiter = line.substring(ownerDataStart).toUpperCase().indexOf(delim.trim().toUpperCase());
                         
-                        // We must ensure this delimiter is not part of the address section itself, 
-                        // but since the original logic was simple, we stick to finding the first occurrence
                         if (rawDelimiter > -1 && (delimiterIndex === -1 || rawDelimiter < delimiterIndex)) {
                             delimiterIndex = rawDelimiter;
                             delimiterLength = delim.length;
@@ -641,7 +435,6 @@
 
                     if (delimiterIndex > -1) {
                         ownerName = ownerAddressRaw.substring(0, delimiterIndex).trim();
-                        // Adjust address start by delimiter length
                         mailingAddress = ownerAddressRaw.substring(delimiterIndex + delimiterLength).trim().replace('—', '').trim();
                     } else {
                         // Fallback: look for first number as start of address (often the street number)
@@ -658,7 +451,7 @@
                     ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
                     mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
 
-                    // Clean up common suffix leftovers
+                    // Clean up common suffix leftovers (already removed in the match, but a safety check)
                     mailingAddress = mailingAddress.replace(/,\s*PUNTA GORDA FL\s*(\d{5})/, '').trim(); 
                     
                     dataMap[unitId] = {
@@ -688,12 +481,14 @@
                     classes += ' inactive bg-gray-100';
                     unitElement.textContent = ''; 
                 } else if (!isDataAvailable) {
-                    // This is for unit numbers without parsed data (shouldn't happen with current data)
                     classes += ' inactive';
                     unitElement.textContent = unit;
                 } else {
                     unitElement.textContent = unit;
                     unitElement.addEventListener('click', () => handleUnitClick(unitElement, unit));
+                    
+                    // Apply initial color based on loaded status
+                    updateUnitColor(unit, allUnitStatuses[unit]);
                 }
 
                 unitElement.className = classes;
@@ -714,11 +509,6 @@
             // Remove existing market classes
             unitElement.classList.remove('for-sale', 'rental');
             
-            // Remove active state unless it's the currently selected unit
-            if (unitId !== activeUnitId) {
-                 unitElement.classList.remove('active');
-            }
-
             // Apply new classes
             if (status && status.forSale) {
                 unitElement.classList.add('for-sale');
@@ -729,61 +519,31 @@
         }
         
         /**
-         * Renders the market status controls (either checkboxes or a disabled message).
+         * Renders the market status controls (checkboxes).
          */
         function renderMarketStatusControls(unitId, marketSection) {
             const currentStatus = allUnitStatuses[unitId] || { forSale: false, rental: false };
             marketSection.style.display = 'flex';
-            
-            if (isRealtimeEnabled) {
-                // Render active checkboxes
-                marketSection.style.flexDirection = 'column';
-                marketSection.innerHTML = `
-                    <h3 class="font-semibold text-indigo-600">Market Status (Real-Time):</h3>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="for-sale-checkbox" ${currentStatus.forSale ? 'checked' : ''}>
-                        <label for="for-sale-checkbox" class="text-orange-600">For Sale (Orange)</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="rental-checkbox" ${currentStatus.rental ? 'checked' : ''}>
-                        <label for="rental-checkbox" class="text-blue-600">Rental (Blue)</label>
-                    </div>
-                    <div class="checkbox-group mt-2">
-                        <label class="text-red-600 font-bold">Both checked = Red</label>
-                    </div>
-                `;
-                // Set up listeners after elements are created
-                setupMarketStatusListeners(unitId);
-            } else {
-                // Render disabled message (Read-Only Mode)
-                updateMarketStatusSectionForDisabledState(marketSection);
-            }
-        }
-        
-        /**
-         * Renders the disabled state message in the market status section.
-         * This function can be called on init failure or save attempt failure.
-         */
-        function updateMarketStatusSectionForDisabledState(marketSection = document.getElementById('market-status-section')) {
-            const statusMessageElement = document.getElementById('status-message');
-            // Get the current detailed error message from the main status bar
-            const currentStatusMessage = statusMessageElement.innerHTML; 
-            
             marketSection.style.flexDirection = 'column';
-            marketSection.style.display = 'flex';
+            
             marketSection.innerHTML = `
-                <h3 class="font-semibold text-indigo-600">Market Status:</h3>
-                <div class="p-3 bg-red-50 border border-red-300 rounded-lg">
-                    <p class="text-red-700 font-bold text-sm mb-1">
-                        <span style="font-size: 1.2em;">&#9888;</span> SAVING DISABLED (Read-Only)
-                    </p>
-                    <div class="text-gray-600 text-xs">
-                        ${currentStatusMessage}
-                    </div>
+                <h3 class="font-semibold text-indigo-600">Market Status (Local Save):</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="for-sale-checkbox" ${currentStatus.forSale ? 'checked' : ''}>
+                    <label for="for-sale-checkbox" class="text-orange-600">For Sale (Orange)</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="rental-checkbox" ${currentStatus.rental ? 'checked' : ''}>
+                    <label for="rental-checkbox" class="text-blue-600">Rental (Blue)</label>
+                </div>
+                <div class="checkbox-group mt-2">
+                    <label class="text-red-600 font-bold">Both checked = Red</label>
                 </div>
             `;
+            // Set up listeners after elements are created
+            setupMarketStatusListeners(unitId);
         }
-
+        
         /**
          * Sets up the event listeners for the market status checkboxes.
          */
@@ -799,9 +559,8 @@
                     forSale: saleCheckbox.checked,
                     rental: rentalCheckbox.checked
                 };
-                // Call async save function
-                saveMarketStatus(unitId, newStatus);
-                // UI update will be handled by the onSnapshot listener when the data syncs
+                // Call synchronous update and persist function
+                updateAndPersistStatus(unitId, newStatus);
             };
 
             saleCheckbox.onchange = saveHandler;
@@ -812,16 +571,14 @@
          * Handles the click event on a unit.
          */
         function handleUnitClick(element, unitId) {
-            // 1. Store the currently active unit ID
-            activeUnitId = unitId;
-            
-            // 2. Remove 'active' class from all units
+            // 1. Remove 'active' class from all units and clear previous active ID
             document.querySelectorAll('.unit').forEach(u => u.classList.remove('active'));
             
-            // 3. Set new active unit
+            // 2. Set new active unit ID and class
+            activeUnitId = unitId;
             element.classList.add('active');
 
-            // 4. Update info panel (including checkbox state/listeners)
+            // 3. Update info panel (including checkbox state/listeners)
             updateInfoPanel(unitId);
         }
 
@@ -845,17 +602,20 @@
             document.getElementById('owner-name').textContent = data.owner || 'N/A';
             document.getElementById('mailing-address').textContent = data.address || 'N/A';
             
-            // Render controls or disabled message based on connection status
+            // Render controls
             renderMarketStatusControls(unitId, marketSection);
         }
 
 
         // --- Main Application Start ---
-        window.onload = async function() {
-            // 1. Parse static data first
+        window.onload = function() {
+            // 1. Parse static unit owner data
             unitInfoData = parseData();
 
-            // 2. Define unit maps
+            // 2. Load market statuses from LocalStorage
+            allUnitStatuses = loadStatusesFromLocalStorage();
+
+            // 3. Define unit maps
             const map_3170 = [
                 '111', '112', '113', '114',
                 '115', '116', '117', '118',
@@ -874,19 +634,11 @@
                 '235', '236', '237', '238'
             ];
             
-            // 3. Render maps
+            // 4. Render maps (this will also apply colors based on loaded LocalStorage data)
             renderMap('grid-3170', map_3170);
             renderMap('grid-3160', map_3160);
 
-            // 4. Initialize Firebase and wait for auth to complete
-            try {
-                // Now uses retry logic to wait for configuration injection
-                await initializeFirebase();
-            } catch (e) {
-                console.error("Initialization error:", e);
-            }
-            
-            // 5. Select a default unit (guaranteed to run after auth is stable)
+            // 5. Select a default unit
             const defaultUnitId = '211';
             const defaultUnitElement = document.getElementById(`unit-${defaultUnitId}`);
             if (defaultUnitElement) {
