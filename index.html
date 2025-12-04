@@ -369,27 +369,42 @@
 
         /**
          * Parses the Firebase configuration from the global environment variable.
-         * Tries to wait for the configuration to be injected.
+         * Tries to wait for the configuration to be injected with multiple retries.
+         * @param {number} retries - The number of times to try to fetch the config.
+         * @param {number} delay - The delay in milliseconds between retries.
          * @returns {Promise<Object>} The parsed firebase config object.
          */
-        async function getFirebaseConfigWithRetry(retries = 5, delay = 100) {
+        async function getFirebaseConfigWithRetry(retries = 10, delay = 200) {
             let firebaseConfig = {};
             const statusMessageElement = document.getElementById('status-message');
-
+            
+            // Wait for up to 2 seconds total (10 retries * 200ms)
             for (let i = 0; i < retries; i++) {
+                
+                // 1. Check if the config variable exists and is non-empty
                 if (typeof __firebase_config === 'string' && __firebase_config.trim() !== '') {
                     try {
-                        firebaseConfig = JSON.parse(__firebase_config);
-                        if (firebaseConfig.apiKey) {
-                            console.log("Firebase config found and parsed.");
-                            return firebaseConfig;
+                        const configAttempt = JSON.parse(__firebase_config);
+                        
+                        // 2. Check if the parsed object contains the essential API key
+                        if (configAttempt.apiKey) {
+                            console.log(`[SUCCESS] Attempt ${i + 1}: Firebase config found and parsed.`);
+                            return configAttempt;
+                        } else {
+                            // Config exists but is invalid (e.g., missing API key field)
+                            console.warn(`[WARNING] Attempt ${i + 1}: __firebase_config found, but is missing 'apiKey' field.`);
                         }
                     } catch (e) {
-                        console.error("CRITICAL ERROR: Failed to parse __firebase_config JSON:", e);
-                        break; // Stop retrying if parsing fails
+                        console.error(`[CRITICAL ERROR] Attempt ${i + 1}: Failed to parse __firebase_config JSON:`, e);
+                        console.error("Raw __firebase_config content that failed to parse:", __firebase_config);
+                        break; 
                     }
+                } else {
+                    console.log(`[RETRY] Attempt ${i + 1}: __firebase_config is not yet injected or is empty. Waiting...`);
                 }
-                statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${i + 1}/${retries})`;
+                
+                // Update status message on UI
+                statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${i + 1}/${retries}). Please wait up to 2 seconds.`;
                 await sleep(delay);
             }
             return {}; // Return empty object if all retries fail
@@ -409,7 +424,7 @@
 
             // 2. CRITICAL CHECK: Ensure the parsed config is valid
             if (!firebaseConfig || !firebaseConfig.apiKey) {
-                const msg = 'CONFIGURATION MISSING: Real-time features disabled. Please ensure the hosting environment provides a valid Firebase config.';
+                const msg = 'CONFIGURATION MISSING: Real-time features disabled. This is an environment issue, not a file structure issue. Status updates are read-only.';
                 console.error(msg);
                 statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
                 statusMessageElement.textContent = msg;
