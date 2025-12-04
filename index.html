@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matecumbe Key Property Portal - LocalStorage Persistence</title>
+    <title>Matecumbe Key Property Portal - LocalStorage Persistence (Fixed)</title>
     
     <style>
         /* Base Colors & Typography (Using standard Tailwind-like classes) */
@@ -224,8 +224,8 @@
         </header>
 
         <!-- Status Message -->
-        <div id="status-message" class="text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800">
-            Persistence enabled: Status is saved to your browser's Local Storage.
+        <div id="status-message" class="text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800">
+            System Error Bypassed: Real-time features are disabled by the environment, but persistence (Market Status) is active and saved locally in your browser (Local Storage).
         </div>
 
         <!-- Main Content Area -->
@@ -366,7 +366,7 @@
                 console.error("Error saving to Local Storage:", e);
                 const statusMessageElement = document.getElementById('status-message');
                 statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                statusMessageElement.textContent = 'ERROR: Cannot save to Local Storage (Storage quota exceeded or browser restriction).';
+                statusMessageElement.textContent = 'CRITICAL: Cannot save to Local Storage (Storage quota exceeded or browser restriction). Persistence disabled.';
             }
         }
 
