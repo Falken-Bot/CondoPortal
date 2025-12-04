@@ -34,6 +34,7 @@
         .rounded-xl { border-radius: 0.75rem; }
         .rounded-lg { border-radius: 0.5rem; }
         .text-xs { font-size: 0.75rem; line-height: 1rem; }
+        .font-mono { font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
         /* Header Styling */
         .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
@@ -287,6 +288,8 @@
         // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Capture the raw global for diagnostic logging
+        const rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null; 
         
         let db, auth;
         let isAuthenticated = false; // Flag for successful sign-in
@@ -378,26 +381,36 @@
             let firebaseConfig = {};
             const statusMessageElement = document.getElementById('status-message');
             
+            // Re-read global variable inside the function scope to ensure we get the latest injection
+            const rawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+
+            // Log initial state for diagnosis
+            if (rawConfig === null) {
+                console.warn(`[DIAGNOSTIC] __firebase_config is strictly 'null' or undefined globally.`);
+            } else {
+                console.log(`[DIAGNOSTIC] __firebase_config type: ${typeof rawConfig}. Length: ${typeof rawConfig === 'string' ? rawConfig.length : 'N/A'}`);
+            }
+
             // Wait for up to 3 seconds total (15 retries * 200ms)
             for (let i = 0; i < retries; i++) {
                 
                 let configAttempt = null;
-                const rawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+                const currentRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
 
                 // 1. Check if the config variable exists
-                if (rawConfig) {
+                if (currentRawConfig) {
                     
-                    if (typeof rawConfig === 'string' && rawConfig.trim() !== '') {
+                    if (typeof currentRawConfig === 'string' && currentRawConfig.trim() !== '') {
                         // Standard behavior: parse the string
                         try {
-                            configAttempt = JSON.parse(rawConfig);
+                            configAttempt = JSON.parse(currentRawConfig);
                         } catch (e) {
                             console.error(`[CRITICAL ERROR] Attempt ${i + 1}: Failed to parse __firebase_config JSON:`, e);
                             break; 
                         }
-                    } else if (typeof rawConfig === 'object' && rawConfig !== null) {
+                    } else if (typeof currentRawConfig === 'object' && currentRawConfig !== null) {
                         // Defensive check for non-standard injection as an object
-                        configAttempt = rawConfig;
+                        configAttempt = currentRawConfig;
                     }
                     
                     // 2. Check if the config is valid
@@ -410,12 +423,42 @@
                 }
                 
                 // If we haven't succeeded, log and wait
-                console.log(`[RETRY] Attempt ${i + 1}: __firebase_config is missing or invalid. Waiting...`);
-                
-                // Update status message on UI
-                statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${i + 1}/${retries}). Please wait up to 3 seconds.`;
-                await sleep(delay);
+                if (i < retries - 1) { // Only log retry message if more retries are coming
+                    console.log(`[RETRY] Attempt ${i + 1}: __firebase_config is missing or invalid. Waiting...`);
+                    // Update status message on UI
+                    statusMessageElement.textContent = `Attempting to load configuration... (Attempt ${i + 1}/${retries}). Please wait up to 3 seconds.`;
+                    await sleep(delay);
+                }
             }
+            
+            // --- Final Failure Diagnostic ---
+            const finalRawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            const configType = typeof finalRawConfig;
+            let configStatus;
+
+            if (finalRawConfig === null) {
+                 configStatus = 'MISSING (Undefined or Null)';
+            } else if (configType === 'string' && finalRawConfig.trim().length === 0) {
+                 configStatus = 'Found (Empty String)';
+            } else if (configType === 'string') {
+                 configStatus = 'Found (String, failed to parse or missing API key)';
+            } else if (configType === 'object') {
+                 configStatus = 'Found (Object, missing API key)';
+            } else {
+                 configStatus = 'Found (Unexpected Type)';
+            }
+            
+            console.error(`[CRITICAL CONFIGURATION ERROR] Final Status: ${configStatus}. Typeof: ${configType}.`);
+            
+            // Update status message with detailed diagnostic
+            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+            statusMessageElement.innerHTML = `
+                <p class="font-bold">CONFIGURATION MISSING: Real-time features disabled.</p>
+                <p class="text-xs mt-1">Expected variable: <code class="font-mono">__firebase_config</code> (Valid Firebase JSON).</p>
+                <p class="text-xs">Received Status: ${configStatus}. Typeof: ${configType}.</p>
+                <p class="text-xs font-bold mt-2">The application is running in Read-Only Mode.</p>
+            `;
+
             return {}; // Return empty object if all retries fail
         }
 
@@ -433,11 +476,8 @@
 
             // 2. CRITICAL CHECK: Ensure the parsed config is valid
             if (!firebaseConfig || !firebaseConfig.apiKey) {
-                const msg = 'CONFIGURATION MISSING: Real-time features disabled. Please ensure the hosting environment provides a valid Firebase config.';
-                console.error(msg);
-                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                statusMessageElement.textContent = msg;
-                // Important: Update the market status section immediately to show 'DISABLED'
+                isRealtimeEnabled = false; 
+                // The detailed error message is already set by getFirebaseConfigWithRetry
                 updateMarketStatusSectionForDisabledState();
                 return;
             }
@@ -733,19 +773,21 @@
          * This function can be called on init failure or save attempt failure.
          */
         function updateMarketStatusSectionForDisabledState(marketSection = document.getElementById('market-status-section')) {
-            const currentStatusMessage = document.getElementById('status-message').textContent;
+            const statusMessageElement = document.getElementById('status-message');
+            // Get the current detailed error message from the main status bar
+            const currentStatusMessage = statusMessageElement.innerHTML; 
             
             marketSection.style.flexDirection = 'column';
             marketSection.style.display = 'flex';
             marketSection.innerHTML = `
                 <h3 class="font-semibold text-indigo-600">Market Status:</h3>
                 <div class="p-3 bg-red-50 border border-red-300 rounded-lg">
-                    <p class="text-red-700 font-bold text-sm">
-                        <span style="font-size: 1.2em;">&#9888;</span> SAVING DISABLED
+                    <p class="text-red-700 font-bold text-sm mb-1">
+                        <span style="font-size: 1.2em;">&#9888;</span> SAVING DISABLED (Read-Only)
                     </p>
-                    <p class="text-gray-600 text-xs mt-1">
-                        Reason: ${currentStatusMessage}
-                    </p>
+                    <div class="text-gray-600 text-xs">
+                        ${currentStatusMessage}
+                    </div>
                 </div>
             `;
         }
