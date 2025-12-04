@@ -187,7 +187,7 @@
         
         /* Styling for the checkbox section */
         .market-status-controls {
-            display: none; /* Hide until unit selected AND DB is ready */
+            display: none; /* Hide until logic determines if enabled or disabled message should show */
             flex-direction: column;
             gap: 0.75rem;
             margin-top: 1rem;
@@ -270,18 +270,7 @@
                         
                         <!-- Market Status Controls -->
                         <div id="market-status-section" class="market-status-controls">
-                            <h3 class="font-semibold text-indigo-600">Market Status (Real-Time):</h3>
-                            <div class="checkbox-group">
-                                <input type="checkbox" id="for-sale-checkbox">
-                                <label for="for-sale-checkbox" class="text-orange-600">For Sale (Orange)</label>
-                            </div>
-                            <div class="checkbox-group">
-                                <input type="checkbox" id="rental-checkbox">
-                                <label for="rental-checkbox" class="text-blue-600">Rental (Blue)</label>
-                            </div>
-                            <div class="checkbox-group mt-2">
-                                <label class="text-red-600 font-bold">Both checked = Red</label>
-                            </div>
+                            <!-- Content will be injected by JavaScript based on isRealtimeEnabled -->
                         </div>
                         
                     </div>
@@ -301,7 +290,8 @@
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
         let db, auth;
-        let isAuthReady = false;
+        let isAuthReady = false; // Auth status check is complete
+        let isRealtimeEnabled = false; // Flag for active database connection and saving ability
         let userId = null;
         let allUnitStatuses = {}; // Global state for market statuses from Firestore
         let activeUnitId = null; // Store the ID of the currently selected unit
@@ -368,9 +358,14 @@
          */
         function initializeFirebase() {
             return new Promise((resolve, reject) => {
+                const statusMessageElement = document.getElementById('status-message');
+
+                // Check 1: Configuration must be present and valid
                 if (!firebaseConfig || !firebaseConfig.apiKey) {
-                    document.getElementById('status-message').textContent = 'Firebase configuration missing. Real-time features disabled.';
+                    statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-yellow-100 text-yellow-800';
+                    statusMessageElement.textContent = 'Firebase configuration missing. Real-time features disabled (Read-Only Mode).';
                     isAuthReady = true;
+                    isRealtimeEnabled = false;
                     resolve();
                     return;
                 }
@@ -387,8 +382,11 @@
 
                     signInPromise.catch((error) => {
                         console.error("Sign-in failed:", error);
-                        // Still try to proceed, but mark as not ready for saving
-                        document.getElementById('status-message').textContent = 'Sign-in failed. Read-only access might be possible.';
+                        statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+                        statusMessageElement.textContent = 'Authentication failed. Status updates will not be saved (Read-Only Mode).';
+                        isAuthReady = true;
+                        isRealtimeEnabled = false;
+                        resolve();
                     });
 
                     // 2. Wait for the Auth State to change
@@ -396,22 +394,22 @@
                         if (user) {
                             userId = user.uid;
                             isAuthReady = true;
-                            document.getElementById('status-message').className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
-                            document.getElementById('status-message').textContent = `Connected (User: ${userId}). Status updates are real-time.`;
+                            isRealtimeEnabled = true; // Success!
                             
-                            // Stop listening for auth changes once authenticated
+                            statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-green-100 text-green-800';
+                            statusMessageElement.textContent = `Connected (User: ${userId}). Status updates are real-time.`;
+                            
                             unsubscribe(); 
                             
-                            // Start the real-time data listener immediately after auth
                             startRealTimeStatusListener();
                             resolve();
                         } else {
-                            // This might fire before the sign-in is complete, or on failure.
-                            // If sign-in fails, we still set ready=true to proceed with the app flow.
+                            // Only fires if sign-in fails or is not yet complete
                             if (!isAuthReady) {
                                 isAuthReady = true;
-                                document.getElementById('status-message').className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                                document.getElementById('status-message').textContent = 'Authentication failed. Status updates will not be saved.';
+                                isRealtimeEnabled = false;
+                                statusMessageElement.className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
+                                statusMessageElement.textContent = 'Authentication failed. Status updates will not be saved (Read-Only Mode).';
                                 resolve();
                             }
                         }
@@ -419,8 +417,9 @@
                 } catch (error) {
                     console.error("Firebase initialization failed:", error);
                     document.getElementById('status-message').className = 'text-center text-sm mb-4 p-2 rounded-lg bg-red-100 text-red-800';
-                    document.getElementById('status-message').textContent = 'Critical error connecting to database.';
+                    document.getElementById('status-message').textContent = 'Critical error connecting to database (Read-Only Mode).';
                     isAuthReady = true;
+                    isRealtimeEnabled = false;
                     reject(error);
                 }
             });
@@ -478,8 +477,12 @@
          * @param {{forSale: boolean, rental: boolean}} status 
          */
         async function saveMarketStatus(unitId, status) {
-            if (!isAuthReady || !db || !userId) {
-                console.warn("Database not ready, not authenticated, or no userId. Cannot save.");
+            if (!isRealtimeEnabled || !db || !userId) {
+                console.warn("Real-time saving is disabled. Cannot save status.");
+                // Provide visual feedback if saving is attempted when disabled
+                const marketSection = document.getElementById('market-status-section');
+                marketSection.innerHTML = `<h3 class="font-semibold text-indigo-600">Market Status:</h3><p class="text-red-600 text-sm mt-1 font-bold">SAVING DISABLED: Checkbox state not saved. Reload the page if connection restores.</p>`;
+                setTimeout(() => updateInfoPanel(unitId), 3000); // Revert UI after 3s
                 return;
             }
             try {
@@ -610,16 +613,57 @@
         }
         
         /**
+         * Renders the market status controls (either checkboxes or a disabled message).
+         */
+        function renderMarketStatusControls(unitId, marketSection) {
+            const currentStatus = allUnitStatuses[unitId] || { forSale: false, rental: false };
+            marketSection.style.display = 'flex';
+            
+            if (isRealtimeEnabled) {
+                // Render active checkboxes
+                marketSection.style.flexDirection = 'column';
+                marketSection.innerHTML = `
+                    <h3 class="font-semibold text-indigo-600">Market Status (Real-Time):</h3>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="for-sale-checkbox" ${currentStatus.forSale ? 'checked' : ''}>
+                        <label for="for-sale-checkbox" class="text-orange-600">For Sale (Orange)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="rental-checkbox" ${currentStatus.rental ? 'checked' : ''}>
+                        <label for="rental-checkbox" class="text-blue-600">Rental (Blue)</label>
+                    </div>
+                    <div class="checkbox-group mt-2">
+                        <label class="text-red-600 font-bold">Both checked = Red</label>
+                    </div>
+                `;
+                // Set up listeners after elements are created
+                setupMarketStatusListeners(unitId);
+            } else {
+                // Render disabled message (Read-Only Mode)
+                marketSection.style.flexDirection = 'column';
+                marketSection.innerHTML = `
+                    <h3 class="font-semibold text-indigo-600">Market Status:</h3>
+                    <div class="p-3 bg-red-50 border border-red-300 rounded-lg">
+                        <p class="text-red-700 font-bold text-sm">
+                            <span style="font-size: 1.2em;">&#9888;</span> Saving Disabled
+                        </p>
+                        <p class="text-gray-600 text-xs mt-1">
+                            Unit status cannot be updated due to database connection issues (Read-Only Mode).
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        /**
          * Sets up the event listeners for the market status checkboxes.
          */
         function setupMarketStatusListeners(unitId) {
             const saleCheckbox = document.getElementById('for-sale-checkbox');
             const rentalCheckbox = document.getElementById('rental-checkbox');
             
-            // CRITICAL: Clear previous listeners to prevent duplicates
-            saleCheckbox.onchange = null;
-            rentalCheckbox.onchange = null;
-            
+            if (!saleCheckbox || !rentalCheckbox) return;
+
             // Attach new listeners
             const saveHandler = () => {
                 const newStatus = {
@@ -658,9 +702,8 @@
         function updateInfoPanel(unitId) {
             const data = unitInfoData[unitId];
             const marketSection = document.getElementById('market-status-section');
-            const saleCheckbox = document.getElementById('for-sale-checkbox');
-            const rentalCheckbox = document.getElementById('rental-checkbox');
-            
+            marketSection.className = 'market-status-controls'; // Ensure base class is set
+
             if (!data) {
                 document.getElementById('info-title').textContent = `Unit ${unitId} Details (Data Missing)`;
                 document.getElementById('owner-name').textContent = 'N/A';
@@ -673,24 +716,8 @@
             document.getElementById('owner-name').textContent = data.owner || 'N/A';
             document.getElementById('mailing-address').textContent = data.address || 'N/A';
             
-            if (isAuthReady) {
-                // Show controls
-                marketSection.style.display = 'flex';
-                
-                // Get current status from the global cache
-                const currentStatus = allUnitStatuses[unitId] || { forSale: false, rental: false };
-                
-                // Update checkbox state
-                saleCheckbox.checked = currentStatus.forSale || false;
-                rentalCheckbox.checked = currentStatus.rental || false;
-
-                // Setup listeners (This is the crucial part that ensures saving works)
-                setupMarketStatusListeners(unitId);
-            } else {
-                 // Hide controls or show disabled message if not authenticated
-                 marketSection.style.display = 'block';
-                 marketSection.innerHTML = `<h3 class="font-semibold text-indigo-600">Market Status:</h3><p class="text-red-500 text-sm mt-1">Database connection not ready. Changes will not be saved.</p>`;
-            }
+            // Render controls or disabled message based on connection status
+            renderMarketStatusControls(unitId, marketSection);
         }
 
 
@@ -724,7 +751,6 @@
 
             // 4. Initialize Firebase and wait for auth to complete
             try {
-                // This call resolves once authentication is stable, which then triggers the real-time listener.
                 await initializeFirebase();
             } catch (e) {
                 console.error("Initialization error:", e);
@@ -734,8 +760,6 @@
             const defaultUnitId = '211';
             const defaultUnitElement = document.getElementById(`unit-${defaultUnitId}`);
             if (defaultUnitElement) {
-                // This triggers handleUnitClick, which in turn calls updateInfoPanel,
-                // which finally sets up the correct checkbox state and listeners.
                 handleUnitClick(defaultUnitElement, defaultUnitId);
             }
         };
