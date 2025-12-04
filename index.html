@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matecumbe Key Property Portal</title>
+    <!-- Load Tailwind CSS for styling and colors (will be used for non-layout elements) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /*
+        * CRITICAL LAYOUT FIXES:
+        * Using pure CSS Grid/Flexbox here to ensure the two-column layout works,
+        * even if Tailwind's utility classes are blocked from loading.
+        */
+        #main-content-layout {
+            display: flex;
+            flex-direction: column; /* Default stack on mobile */
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        #map-section {
+            width: 100%; /* Default mobile width */
+        }
+        
+        #info-section {
+            width: 100%; /* Default mobile width */
+        }
+
+        @media (min-width: 1024px) { /* Equivalent to Tailwind 'lg:' breakpoint */
+            #main-content-layout {
+                flex-direction: row; /* Two columns on desktop */
+            }
+
+            #map-section {
+                /* Approximately lg:w-2/3 */
+                width: 66.666667%; 
+            }
+            
+            #info-section {
+                /* Approximately lg:w-1/3 */
+                width: 33.333333%;
+            }
+        }
+
+        /* Unit Map Container Grid */
+        .unit-map-container {
+            display: grid;
+            grid-template-columns: 1fr; /* Default stack on mobile */
+            gap: 2rem;
+        }
+        
+        @media (min-width: 768px) {
+            .unit-map-container {
+                grid-template-columns: 1fr 1fr; /* Two columns for the buildings on tablet/desktop */
+            }
+        }
+
+        /* Individual Building Grid (4 columns inside each building) */
+        .building-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 4px;
+            padding: 16px;
+            border: 2px solid #4f46e5; /* indigo-600 */
+            border-radius: 12px;
+            background-color: #eef2ff; /* indigo-50 */
+        }
+
+        .unit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 50px; 
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151; /* gray-700 */
+            background-color: #ffffff;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .unit:hover {
+            background-color: #fde047; /* yellow-300 */
+            transform: scale(1.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        .unit.active {
+            background-color: #4f46e5; /* indigo-600 */
+            color: #ffffff;
+            border-color: #4338ca; /* indigo-700 */
+        }
+
+        .unit.inactive {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #9ca3af; /* gray-400 */
+            cursor: default;
+        }
+        
+        .unit.inactive.bg-gray-100 { /* For N/A placeholders */
+            background-color: #f3f4f6; 
+            border-style: dashed;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-indigo-700">Matecumbe Key Unit Map</h1>
+            <p class="text-lg text-gray-600 mt-2">Click a unit to view owner information.</p>
+        </header>
+
+        <!-- Main Content Area - Uses IDs for robust CSS layout -->
+        <div id="main-content-layout">
+            
+            <!-- Unit Map Section -->
+            <div id="map-section">
+                <div class="unit-map-container">
+                    <!-- Building 3170 -->
+                    <div id="building-3170-map" class="building-card">
+                        <h2 class="text-xl font-bold mb-4 text-center text-indigo-600 p-2 bg-indigo-100 rounded-t-lg">Building 3170 (Matecumbe Key Rd)</h2>
+                        <div class="building-grid" id="grid-3170">
+                            <!-- Units will be inserted here by JavaScript -->
+                        </div>
+                        <p class="text-sm text-center text-gray-500 mt-2">Units 111-138 (Schematic View)</p>
+                    </div>
+
+                    <!-- Building 3160 -->
+                    <div id="building-3160-map" class="building-card">
+                        <h2 class="text-xl font-bold mb-4 text-center text-indigo-600 p-2 bg-indigo-100 rounded-t-lg">Building 3160 (Matecumbe Key Rd)</h2>
+                        <div class="building-grid" id="grid-3160">
+                             <!-- Units will be inserted here by JavaScript -->
+                        </div>
+                        <p class="text-sm text-center text-gray-500 mt-2">Units 211-238 (Schematic View)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Information Panel Section -->
+            <div id="info-section">
+                <div id="info-panel" class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 sticky top-4">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800" id="info-title">Select a Unit</h2>
+                    <div id="info-content" class="text-gray-700">
+                        <p>Click on any unit in the map to the left to display the owner's details here.</p>
+                        
+                        <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-semibold text-indigo-600">Owner Name:</h3>
+                            <p id="owner-name" class="break-words italic text-gray-500">Awaiting selection...</p>
+                            
+                            <h3 class="font-semibold text-indigo-600 mt-3">Mailing Address:</h3>
+                            <p id="mailing-address" class="break-words italic text-gray-500">Awaiting selection...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Raw data provided by the user (embedded directly into the script)
+        const RAW_DATA = `3170 MATECUMBE KEY RD 111, Punta Gorda FL 33955 WYNNIK DARREN T + WYNNIK HEATHER Z — 3553 Potato Garden Run Rd, Imperial PA 15126
+3170 MATECUMBE KEY RD 112, Punta Gorda FL 33955 FUNK SHEILA TR (For Sheila Funk Trust) — 473 Edgewater Dr, Morris IL 60450
+3170 MATECUMBE KEY RD 113, Punta Gorda FL 33955 ENGKJER WANE S TR (For Waterfront Trust) — 51628 Pelican Point Dr, Detroit Lakes MN 56501
+3170 MATECUMBE KEY RD 114, Punta Gorda FL 33955 2ND BILL RENTALS LLC — 17917 Courtside Landings Cir,, Punta Gorda FL 33955
+3170 MATECUMBE KEY RD 115, Punta Gorda FL 33955 ORSINI WENDY L — P.O. Box 242, Pellston MI 49769
+3170 MATECUMBE KEY RD 116, Punta Gorda FL 33955 HUFFMAN W ALAN + KATHRYN R TR (For W Alan Huffman Trust) — 4080 Cape Cole Blvd,, Punta Gorda FL 33955
+3170 MATECUMBE KEY RD 117, Punta Gorda FL 33955 TENNYSON CHRISTOPHER + LISA — 69 Pine Valley Ct, Rotonda West FL 33947
+3170 MATECUMBE KEY RD 118, Punta Gorda FL 33955 GREEN PETER + CLINTON RITA — 3870 Ontario Dr, North Tonawanda NY 14120
+3170 MATECUMBE KEY RD 121, Punta Gorda FL 33955 HOLBEIN MARK ALLEN — 103 McIntyre Ln, Freeport PA 16229
+3170 MATECUMBE KEY RD 122, Punta Gorda FL 33955 MANJ LLC — P.O. Box 682, Park Ridge IL 60068
+3170 MATECUMBE KEY RD 123, Punta GORDA FL 33955 HOLBEIN MARK ALLEN 103 MCNTY RE LN FREEPORT PA 16229
+3170 MATECUMBE KEY RD 124, Punta GORDA FL 33955 LONERGAN MARK S 1812 NE 44TH ST CAPE CORAL FL 33909
+3170 MATECUMBE KEY RD 125, Punta GORDA FL 33955 SIMPSON JUDY 2545 DIANE AVE NORTH HUNTINGDON PA 15642
+3170 MATECUMBE KEY RD 126, Punta GORDA FL 33573 LEVENDOFSKY LISA J 1321 VIA TOSCANA WAY SUN CITY CENTER FL 33573
+3170 MATECUMBE KEY RD 127, Punta GORDA FL 33955 PERRAUD ROBERT C & PERRAUD CYNTHIA M PERRAUD TRUST 1910 E COCKATOO LN MELBOURNE BEACH FL 32951
+3170 MATECUMBE KEY RD 128, Punta GORDA FL 33955 PETTY ROBERT R & JUDITH N 2511 CARDINAL HARBOUR RD PROSPECT KY 40059
+3170 MATECUMBE KEY RD 131, Punta GORDA FL 33955 JENNINGS STEVEN + GROTHE DARLA
+3170 MATECUMBE KEY RD 132, Punta GORDA FL 33955 ANDERSON MICHAEL P & ZIEGENHORN CATHERINE 7455 BOCA VISTA ROAD, Punta GORDA FL 33955
+3170 MATECUMBE KEY RD 133, Punta GORDA FL 33955 SHANNON GERALD T TR FOR SHANNON TRUST PO BOX 775 WAKEFIELD ME 04086
+3170 MATECUMBE KEY RD 134, Punta GORDA FL 33955 LIBBY ROBERT W & CYNTHIA F 463 OLD MEETINGHOUSE RD PORTER ME 04068
+3170 MATECUMBE KEY RD 135, Punta GORDA FL 33955 FOLIO ANTHONY J 3170 MATECUMBE KEY RD #135, Punta GORDA FL 33955
+3170 MATECUMBE KEY RD 137, Punta GORDA FL 33955 LINDAHL JULIE 3170 MATECUMBE KEY RD #137, Punta GORDA FL 33955
+3170 MATECUMBE KEY RD 138, Punta GORDA FL 33955 CALL WILLIAM H JR & CALL BOBBI JD 3 STEVEN LN STEEP FALLS ME 04085
+3160 MATECUMBE KEY RD 235 PUNTA GORDA FL 33955 KLADE BEATRICE 27W070 80TH ST NAPERVILLE IL 60565
+3160 MATECUMBE KEY RD 236 PUNTA GORDA FL 33955 FLAHERTY JEFFREY SCOTT 905 CROSSING DR COVINGTON KY 41017
+3160 MATECUMBE KEY RD 237 PUNTA GORDA FL 33955 AMMONS MAURICE ALLEN III + AMMONS DEBRA ENGLERT 1613 ST THOMAS DR MIDLOTHIAN VA 23114
+3160 MATECUMBE KEY RD 238 PUNTA GORDA FL 33955 BASHAM DAVID W L/E 4581 N PASEO DE LOS CERRITOS TUCSON AZ 85745
+3160 MATECUMBE KEY RD 223 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
+3160 MATECUMBE KEY RD 224 PUNTA GORDA FL 33955 LEGER GERALD F & AMY L 25 ERIE LN GROTON CT 06340
+3160 MATECUMBE KEY RD 225 PUNTA GORDA FL 33955 MARSHALL LARRY 3160 MATECUMBE KEY RD #225 PUNTA GORDA FL 33955
+3160 MATECUMBE KEY RD 226 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
+3160 MATECUMBE KEY RD 227 PUNTA GORDA FL 33955 STEFANSKI PETER 3605 S MAYFIELD RD JACKSON WI 53037
+3160 MATECUMBE KEY RD 228 PUNTA GORDA FL 33955 BADILLO LUIS & SANDRA 3160 MATECUMBE KEY RD #228 PUNTA GORDA FL 33955
+3160 MATECUMBE KEY RD 231 PUNTA GORDA FL 33955 HARWOOD GERALD W & HARWOOD JACQUELYN H 5198 ARROWWOOD DR PARK CITY UT 84098
+3160 MATECUMBE KEY RD 232 PUNTA GORDA FL 33955 TRAVER-MUZIO SHARRON E + OBRIEN PHILLIP E L/E 24707 CEDAR RIDGE LANDINGS CIR PUNTA GORDA FL 33955
+3160 MATECUMBE KEY RD 233 PUNTA GORDA FL 33955 MCDONAGH BARBARA A 5 ROCKY HOOK WALDEN MA 01880
+3160 MATECUMBE KEY RD 234 PUNTA GORDA FL 33955 VECCHIARELLI ANGELO A + CARMONA BRENDA J 191 FLOWERING RIDGE RD WHITTIER NC 28789
+3160 MATECUMBE KEY RD 211 PUNTA GORDA FL 33955 SANDERS KENNETH H III & SANDERS ROBERTA F + CLARK J A III ET AL 4919 GABRIEL LN WAUCHULA FL 33873
+3160 MATECUMBE KEY RD 212 PUNTA GORDA FL 33955 SCOTT JOSEPH & TERRI LYNN 7996 AQUA ISLE CLAY MI 48001
+3160 MATECUMBE KEY RD 213 PUNTA GORDA FL 33955 ANTHONSEN GARY 3797 PLUECKHAHN LANDINGS CIR PUNTA GORDA FL 33955
+3160 MATECUMBE KEY RD 214 PUNTA GORDA FL 33955 LALONE DEREK J & NANETTE M 7779 COLONY DR CLAY MI 48001
+3160 MATECUMBE KEY RD 215 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 10398 ATENIA ST PORT CHARLOTTE FL 33981
+3160 MATECUMBE KEY RD 216 PUNTA GORDA FL 33955 WHELAN WILLIAM W & WHELAN BARBARA W TR TRUST 3245 SUGARLOAF KEY RD #216 PUNTA GORDA FL 33955
+3160 MATECUMBE KEY RD 217 PUNTA GORDA FL 33955 WEGENER JAMES W & BEVERLY S 9624 DUNES DR FORT PIERCE SD 57532
+3160 MATECUMBE KEY RD 218 PUNTA GORDA FL 33955 TANNOUS BETH ANN 3160 MATECUMBE KEY RD #218 PUNTA GORDA FL 33955
+3160 MATECUMBE KEY RD 221 PUNTA GORDA FL 33955 JOE S AUTOWHOLESALE INC 5708 RALEIGH DR NORFOLK VA 23502
+3160 MATECUMBE KEY RD 222 PUNTA GORDA FL 33955 WTRENTAL 5 LLC 27W070 80TH ST NAPERVILLE IL 60565`;
+
+        let unitData = {};
+        let activeUnit = null;
+
+        /**
+         * Parses the raw text data into a structured JavaScript object.
+         */
+        function parseData() {
+            const lines = RAW_DATA.trim().split('\n');
+            const dataMap = {};
+
+            lines.forEach(line => {
+                // Capture the building prefix (31xx) and the unit number (xxx).
+                const match = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3})/);
+                
+                if (match) {
+                    const fullAddressPrefix = match[1]; 
+                    const unitNumber = match[2]; 
+                    const unitId = unitNumber; 
+
+                    // Find the end of the property address (after the ZIP code 33955)
+                    const endOfPropertyInfo = line.indexOf('33955');
+                    
+                    if (endOfPropertyInfo !== -1) {
+                        // Extract the raw string containing the Owner and Mailing Address
+                        const ownerAddressRaw = line.substring(endOfPropertyInfo + 5).trim();
+
+                        let ownerName = '';
+                        let mailingAddress = ownerAddressRaw;
+
+                        // Try to separate name and address based on delimiters or the start of the street address number
+                        const delimiters = ['—', ' L/E ', ' TR ', ' LLC ', ' INC ', ' ET AL '];
+                        let delimiterIndex = -1;
+
+                        // Find the first occurrence of a strong delimiter
+                        for (const delim of delimiters) {
+                            const index = ownerAddressRaw.toUpperCase().indexOf(delim);
+                            if (index > -1 && (delimiterIndex === -1 || index < delimiterIndex)) {
+                                delimiterIndex = index;
+                            }
+                        }
+
+                        if (delimiterIndex > -1) {
+                            // Extract owner name up to the delimiter
+                            ownerName = ownerAddressRaw.substring(0, delimiterIndex).trim();
+                            
+                            // Extract mailing address after the delimiter
+                            const delimiterUsed = delimiters.find(delim => ownerAddressRaw.toUpperCase().substring(delimiterIndex).startsWith(delim));
+                            mailingAddress = ownerAddressRaw.substring(delimiterIndex + (delimiterUsed ? delimiterUsed.length : 0)).trim().replace('—', '').trim();
+
+                        } else {
+                            // If no clear delimiter, split by the first appearance of a number which usually starts the street address
+                            const firstDigitIndex = ownerAddressRaw.search(/\d/);
+                            if (firstDigitIndex > 10) { 
+                                ownerName = ownerAddressRaw.substring(0, firstDigitIndex).trim();
+                                mailingAddress = ownerAddressRaw.substring(firstDigitIndex).trim();
+                            } else {
+                                // Fallback: use the whole raw string
+                                ownerName = ownerAddressRaw;
+                                mailingAddress = "Address requires manual separation.";
+                            }
+                        }
+                        
+                        // Final cleanups
+                        ownerName = ownerName.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
+                        mailingAddress = mailingAddress.replace(/,,/g, ',').replace(/\s+/g, ' ').trim();
+
+                        dataMap[unitId] = {
+                            building: fullAddressPrefix,
+                            owner: ownerName,
+                            address: mailingAddress,
+                        };
+                    }
+                }
+            });
+            return dataMap;
+        }
+
+        /**
+         * Renders the unit map for a given building.
+         */
+        function renderMap(buildingId, containerId, unitList) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = ''; // Clear previous content
+
+            unitList.forEach(unit => {
+                const isDataAvailable = unitData[unit] !== undefined;
+                
+                const unitElement = document.createElement('div');
+                unitElement.className = `unit ${isDataAvailable && unit !== 'N/A' ? 'has-data' : 'inactive'}`;
+                unitElement.id = `unit-${unit}`;
+                unitElement.dataset.unitId = unit;
+                
+                if (unit === 'N/A') {
+                    // This is an empty placeholder to maintain the schematic grid structure
+                    unitElement.textContent = ''; 
+                    // Keeping these Tailwind classes as they are used for basic colors/styles, not layout
+                    unitElement.classList.add('bg-gray-100', 'border-dashed', 'border-gray-300', 'cursor-default', 'hover:transform-none', 'hover:shadow-none', 'hover:bg-gray-100');
+                } else {
+                    unitElement.textContent = unit;
+                    if (isDataAvailable) {
+                        unitElement.addEventListener('click', () => handleUnitClick(unitElement, unit));
+                    }
+                }
+
+
+                container.appendChild(unitElement);
+            });
+        }
+
+        /**
+         * Handles the click event on a unit.
+         */
+        function handleUnitClick(element, unitId) {
+            // Remove 'active' class from all units
+            document.querySelectorAll('.unit').forEach(u => u.classList.remove('active'));
+            
+            // Set new active unit
+            element.classList.add('active');
+            activeUnit = element;
+
+            // Update info panel
+            updateInfoPanel(unitId);
+        }
+
+        /**
+         * Updates the information panel with data for the selected unit.
+         */
+        function updateInfoPanel(unitId) {
+            const data = unitData[unitId];
+            
+            document.getElementById('info-title').textContent = `Unit ${unitId} Details`;
+            document.getElementById('owner-name').textContent = data.owner || 'N/A';
+            document.getElementById('mailing-address').textContent = data.address || 'N/A';
+        }
+
+
+        // --- Initialization ---
+        window.onload = function() {
+            unitData = parseData();
+
+            // Unit lists are manually ordered for a clean, 4x6 grid layout (24 slots each).
+            // 'N/A' is used as a schematic placeholder for units that are not in the data but
+            // are needed to complete the grid structure.
+            
+            // Building 3170 Map Layout (100 series) - 23 units + 1 placeholder = 24 total slots
+            const map_3170 = [
+                '111', '112', '113', '114',
+                '115', '116', '117', '118',
+                '121', '122', '123', '124',
+                '125', '126', '127', '128',
+                '131', '132', '133', '134',
+                '135', 'N/A', '137', '138' 
+            ];
+            renderMap('3170', 'grid-3170', map_3170);
+            
+            // Building 3160 Map Layout (200 series) - 24 units = 24 total slots
+            const map_3160 = [
+                '211', '212', '213', '214', 
+                '215', '216', '217', '218',
+                '221', '222', '223', '224',
+                '225', '226', '227', '228',
+                '231', '232', '233', '234',
+                '235', '236', '237', '238'
+            ];
+            renderMap('3160', 'grid-3160', map_3160);
+            
+            // Automatically select the first unit to populate the info panel initially
+            const firstUnitId = map_3170.find(id => id !== 'N/A');
+            if (firstUnitId) {
+                const firstUnitElement = document.getElementById(`unit-${firstUnitId}`);
+                if (firstUnitElement) {
+                    handleUnitClick(firstUnitElement, firstUnitId);
+                }
+            }
+        };
+    </script>
+</body>
+</html>
