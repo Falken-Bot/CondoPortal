@@ -458,7 +458,7 @@
                         
                         // 3. If the changed unit is the currently selected one, update the checkbox UI
                         if (unitId === activeUnitId) {
-                            updateCheckboxUI(status);
+                            updateInfoPanel(unitId); // Re-run to update checkboxes and info
                         }
                     } else if (change.type === "removed") {
                         // Clear status if removed
@@ -506,7 +506,7 @@
         function parseData() {
             const lines = RAW_DATA.trim().split('\n');
             const dataMap = {};
-            // ... (Parsing logic remains the same) ...
+            
             lines.forEach(line => {
                 const propertyAddressMatch = line.match(/(31\d{2}) MATECUMBE KEY RD\s*(\d{3}),?\s*Punta GORDA FL\s*(\d{5})/i);
 
@@ -610,29 +610,13 @@
         }
         
         /**
-         * Updates the checkbox UI in the details panel based on the provided status.
-         */
-        function updateCheckboxUI(status) {
-            const saleCheckbox = document.getElementById('for-sale-checkbox');
-            const rentalCheckbox = document.getElementById('rental-checkbox');
-            
-            // Set the checked state (use || false for safe access)
-            saleCheckbox.checked = status.forSale || false;
-            rentalCheckbox.checked = status.rental || false;
-            
-            // Re-attach listeners just in case
-            setupMarketStatusListeners(activeUnitId);
-        }
-
-        /**
-         * Attaches the event listeners to the checkboxes.
-         * Separated from setting UI state to prevent re-attaching listeners redundantly.
+         * Sets up the event listeners for the market status checkboxes.
          */
         function setupMarketStatusListeners(unitId) {
             const saleCheckbox = document.getElementById('for-sale-checkbox');
             const rentalCheckbox = document.getElementById('rental-checkbox');
             
-            // CRITICAL: Clear previous listeners
+            // CRITICAL: Clear previous listeners to prevent duplicates
             saleCheckbox.onchange = null;
             rentalCheckbox.onchange = null;
             
@@ -642,9 +626,9 @@
                     forSale: saleCheckbox.checked,
                     rental: rentalCheckbox.checked
                 };
+                // Call async save function
                 saveMarketStatus(unitId, newStatus);
-                // Note: The UI update (color change and checkbox state) happens automatically
-                // via the onSnapshot listener after the data is saved to Firestore.
+                // UI update will be handled by the onSnapshot listener when the data syncs
             };
 
             saleCheckbox.onchange = saveHandler;
@@ -664,38 +648,49 @@
             // 3. Set new active unit
             element.classList.add('active');
 
-            // 4. Update info panel
+            // 4. Update info panel (including checkbox state/listeners)
             updateInfoPanel(unitId);
-            
-            // 5. Setup market status controls (if auth is ready)
-            if (isAuthReady) {
-                document.getElementById('market-status-section').style.display = 'flex';
-                // Read the current status from the global real-time cache and update UI
-                const currentStatus = allUnitStatuses[unitId] || { forSale: false, rental: false };
-                updateCheckboxUI(currentStatus);
-            } else {
-                 // Show controls but disabled if not authenticated/ready
-                 document.getElementById('market-status-section').style.display = 'block';
-                 document.getElementById('market-status-section').innerHTML = `<h3 class="font-semibold text-indigo-600">Market Status:</h3><p class="text-red-500 text-sm mt-1">Database connection not ready. Changes will not be saved.</p>`;
-            }
         }
 
         /**
-         * Updates the information panel with data for the selected unit.
+         * Updates the information panel with data for the selected unit and sets up controls.
          */
         function updateInfoPanel(unitId) {
             const data = unitInfoData[unitId];
+            const marketSection = document.getElementById('market-status-section');
+            const saleCheckbox = document.getElementById('for-sale-checkbox');
+            const rentalCheckbox = document.getElementById('rental-checkbox');
             
             if (!data) {
                 document.getElementById('info-title').textContent = `Unit ${unitId} Details (Data Missing)`;
                 document.getElementById('owner-name').textContent = 'N/A';
                 document.getElementById('mailing-address').textContent = 'N/A';
+                marketSection.style.display = 'none';
                 return;
             }
             
             document.getElementById('info-title').textContent = `Unit ${unitId} Details`;
             document.getElementById('owner-name').textContent = data.owner || 'N/A';
             document.getElementById('mailing-address').textContent = data.address || 'N/A';
+            
+            if (isAuthReady) {
+                // Show controls
+                marketSection.style.display = 'flex';
+                
+                // Get current status from the global cache
+                const currentStatus = allUnitStatuses[unitId] || { forSale: false, rental: false };
+                
+                // Update checkbox state
+                saleCheckbox.checked = currentStatus.forSale || false;
+                rentalCheckbox.checked = currentStatus.rental || false;
+
+                // Setup listeners (This is the crucial part that ensures saving works)
+                setupMarketStatusListeners(unitId);
+            } else {
+                 // Hide controls or show disabled message if not authenticated
+                 marketSection.style.display = 'block';
+                 marketSection.innerHTML = `<h3 class="font-semibold text-indigo-600">Market Status:</h3><p class="text-red-500 text-sm mt-1">Database connection not ready. Changes will not be saved.</p>`;
+            }
         }
 
 
@@ -729,6 +724,7 @@
 
             // 4. Initialize Firebase and wait for auth to complete
             try {
+                // This call resolves once authentication is stable, which then triggers the real-time listener.
                 await initializeFirebase();
             } catch (e) {
                 console.error("Initialization error:", e);
@@ -738,6 +734,8 @@
             const defaultUnitId = '211';
             const defaultUnitElement = document.getElementById(`unit-${defaultUnitId}`);
             if (defaultUnitElement) {
+                // This triggers handleUnitClick, which in turn calls updateInfoPanel,
+                // which finally sets up the correct checkbox state and listeners.
                 handleUnitClick(defaultUnitElement, defaultUnitId);
             }
         };
